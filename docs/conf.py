@@ -54,3 +54,7 @@ autodoc_mock_imports = ['sudio.suio', 'sudio.io', 'scipy', 'numpy']
 html_context = {
     "google_analytics_id": "G-RLP20V08DB",
 }
+html_css_files = [
+    'style.css',
+]
+
