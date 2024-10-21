@@ -15,6 +15,7 @@ Welcome to the Sudio 🎵
    :alt: sudio
    :width: 60%
    :align: center
+   :class: no-click
 
 
 .. raw:: html
