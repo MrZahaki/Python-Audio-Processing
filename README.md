@@ -8,7 +8,7 @@
 # Sudio 🎵
 
 [![PyPI version](https://badge.fury.io/py/sudio.svg)](https://badge.fury.io/py/sudio)
-[![Downloads](https://pepy.tech/badge/sudio)](https://pepy.tech/project/sudio)
+![PyPI Downloads](https://static.pepy.tech/badge/sudio)
 [![Documentation Status](https://readthedocs.org/projects/sudio/badge/?version=latest)](https://sudio.readthedocs.io/en/latest/?badge=latest)
 [![Build Status](https://github.com/mrzahaki/sudio/actions/workflows/python-package.yml/badge.svg)](https://github.com/mrzahaki/sudio/actions/workflows/python-package.yml)
 [![Python Version](https://img.shields.io/pypi/pyversions/sudio.svg)](https://pypi.org/project/sudio/)
