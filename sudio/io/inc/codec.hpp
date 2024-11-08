@@ -11,6 +11,7 @@
 #include <vector>
 #include <string>
 #include <functional>
+#include <cstdint>
 #include <memory>
 
 
@@ -66,7 +67,16 @@ namespace suio {
                                         uint32_t sampleRate,
                                         int bitrate,
                                         int quality
-                                        );                            
+                                        );
+
+        static std::vector<uint8_t> encodeToMP3(
+            const std::vector<uint8_t>& data,
+            ma_format format,
+            uint32_t nchannels,
+            uint32_t sampleRate,
+            int bitrate,
+            int quality
+            );                                                                     
 
          static uint64_t encodeFlacFile(const std::string& filename,
                                     const std::vector<uint8_t>& data,
@@ -116,6 +126,13 @@ namespace suio {
             uint32_t m_nchannels;
             ma_format m_outputFormat;
         };
+
+        static std::vector<uint8_t> encodeToWav(
+        const std::vector<uint8_t>& data,
+        ma_format format,
+        uint32_t nchannels,
+        uint32_t sampleRate);
+
     };
 
 }  // namespace suio

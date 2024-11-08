@@ -14,8 +14,51 @@
 #include <functional>
 #include <memory>
 #include <atomic>
+#include <stdexcept>
+
+
+# ifdef PA_ENABLE_DEBUG_OUTPUT
+    # undef PA_ENABLE_DEBUG_OUTPUT
+# endif
 
 namespace stdstream {
+
+// Base exception class for all audio-related errors
+class AudioException : public std::runtime_error {
+public:
+    explicit AudioException(const std::string& message) : std::runtime_error(message) {}
+};
+
+// Initialization and setup errors
+class AudioInitException : public AudioException {
+public:
+    explicit AudioInitException(const std::string& message) : AudioException(message) {}
+};
+
+// Device-related errors
+class DeviceException : public AudioException {
+public:
+    explicit DeviceException(const std::string& message) : AudioException(message) {}
+};
+
+// Invalid parameter errors
+class InvalidParameterException : public AudioException {
+public:
+    explicit InvalidParameterException(const std::string& message) : AudioException(message) {}
+};
+
+// Stream operation errors
+class StreamException : public AudioException {
+public:
+    explicit StreamException(const std::string& message) : AudioException(message) {}
+};
+
+// Resource unavailable errors
+class ResourceException : public AudioException {
+public:
+    explicit ResourceException(const std::string& message) : AudioException(message) {}
+};
+
 
 struct AudioDeviceInfo {
     int index;
@@ -81,7 +124,12 @@ private:
     bool outputEnabled;
 };
 
-void writeToDefaultOutput(const std::vector<uint8_t>& data, PaSampleFormat sampleFormat, 
-                          int channels, double sampleRate);
+void writeToDefaultOutput(
+    const std::vector<uint8_t>& data, 
+    PaSampleFormat sampleFormat, 
+    int channels, 
+    double sampleRate,
+    int outputDeviceIndex = -1
+    );
 
 } // namespace stdstream

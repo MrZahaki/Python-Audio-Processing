@@ -41,6 +41,7 @@ sudio/io/vorbis/
 docs/_build
 docs/doxyoutput
 docs/api
+examples/
 
 # PyInstaller
 *.manifest

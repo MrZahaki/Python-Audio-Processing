@@ -8,13 +8,14 @@ import scipy.signal as scisig
 import threading
 import queue
 import numpy as np
-from typing import Union, Callable
+from typing import Union, Callable, Generator
 import warnings
 import gc
 import time
 import os
 from io import BufferedRandom
 import traceback
+from pathlib import Path
 
 
 from sudio.types import StreamMode, RefreshError
@@ -35,29 +36,30 @@ from sudio.pipeline import Pipeline
 from sudio.metadata import AudioRecordDatabase, AudioMetadata
 from sudio.io import SampleFormat, codec, write_to_default_output, AudioStream
 from sudio.io import AudioDeviceInfo, get_sample_size, FileFormat
+from sudio.io._webio import WebAudioIO
 
 
 
 class Master:
 
     CACHE_INFO = 4 * 8
-    BUFFER_TYPE = '.bin'
+    BUFFER_TYPE = '.su'
 
     def __init__(self,
-                 std_input_dev_id: int = None,
-                 std_output_dev_id: int = None,
+                 input_device_index: int = None,
+                 output_device_index: int = None,
                  data_format: SampleFormat = SampleFormat.SIGNED16,
                  nperseg: int = 500,
                  noverlap: int = None,
                  window: object = 'hann',
                  NOLA_check: bool = True,
-                 input_dev_sample_rate: int = 48000,
-                 input_dev_nchannels: int = None,
+                 input_dev_sample_rate: int = 44100,
+                 input_dev_nchannels: int = 2,
                  input_dev_callback: Callable = None,
-                 output_dev_nchannels:int = None,
+                 output_dev_nchannels:int = 2,
                  output_dev_callback: Callable = None,
                  buffer_size: int = 30,
-                 audio_data_directory: str = './data/'
+                 audio_data_directory: str = './sudio/',
                  ):
         
         """
@@ -70,9 +72,9 @@ class Master:
 		Parameters
 		----------
 
-		- **std_input_dev_id** : Standard input device ID (default: `None`).
+		- **input_device_index** : Standard input device ID (default: `None`).
 		  If None, uses the system's default input device.
-		- **std_output_dev_id** : Standard output device ID (default: `None`).
+		- **output_device_index** : Standard output device ID (default: `None`).
 		  If None, uses the system's default output device.
 		- **data_format** : SampleFormat, optional
 		  The sample format of the audio. Default is 16-bit integer (SIGNED16).
@@ -105,7 +107,7 @@ class Master:
 		- **buffer_size** : int, optional
 		  Size of the sound buffer. Default is 30.
 		- **audio_data_directory** : str, optional
-		  Directory for storing audio data (default: `'./data/'`).
+		  Directory for storing audio data (default: `'./sudio/'`).
 
         Notes
         -----
@@ -115,16 +117,21 @@ class Master:
         - Window functions are crucial for spectral analysis and should be chosen carefully.
         - NOLA constraint ensures proper reconstruction in overlap-add methods.
         - Custom callbacks allow for flexible input/output handling but require careful implementation.
-
-
         """
-        
+
         self._sound_buffer_size = buffer_size
         self._stream_type = StreamMode.optimized
         self._sample_format_type = data_format
         self.input_dev_callback = None
         self.output_dev_callback = None
         self._default_stream_callback = self._input_stream_callback
+        self._sample_format = data_format
+        self._nperseg = nperseg
+        self._data_chunk = nperseg
+        self._sample_width = get_sample_size(data_format)
+        self._sample_width_format_str = (
+            '<f{}'.format(self._sample_width) if data_format == SampleFormat.FLOAT32.value else '<i{}'.format(self._sample_width)
+        )
 
         # Initialize threading events and flags
         self._exstream_mode = threading.Event()
@@ -141,55 +148,160 @@ class Master:
             os.mkdir(self._audio_data_directory)
         except FileExistsError:
             pass
-        warnings.filterwarnings("ignore")
+
         self._output_device_index = None
         input_channels = int(1e6)
-
-        if callable(input_dev_callback):
-            self.input_dev_callback = input_dev_callback
-            self._default_stream_callback = self._custom_stream_callback
-            input_channels = input_dev_nchannels
-            self._sample_rate = input_dev_sample_rate
-
-        elif std_input_dev_id is None:
-            dev = self.get_default_input_device_info()
-            self._sample_rate = int(dev.default_sample_rate)
-            input_channels = dev.max_input_channels
-            self._std_input_dev_id = dev.index
-
-        else:
-            self._std_input_dev_id = std_input_dev_id
-            dev = self.get_device_info_by_index(std_input_dev_id)
-            input_channels = dev.max_input_channels
-            self._sample_rate = int(dev.default_sample_rate)
-
-        self._sample_width = get_sample_size(data_format)
-        self._sample_format = data_format
         output_channels = int(1e6)
 
-        if callable(output_dev_callback):
-            self.output_dev_callback = output_dev_callback
-            output_channels = output_dev_nchannels
-        elif std_output_dev_id is None:
-            dev = self.get_default_output_device_info()
-            self._output_device_index = dev.index
-            output_channels = dev.max_output_channels
-        else:
-            self._std_input_dev_id = std_output_dev_id
-            dev = self.get_device_info_by_index(std_output_dev_id)
-            output_channels = dev.max_output_channels
+        try:
+            if callable(input_dev_callback):
+                self.input_dev_callback = input_dev_callback
+                self._default_stream_callback = self._custom_stream_callback
+
+            try:
+                count = self.get_device_count()
+            except Exception as e:
+                raise EOFError(f'{e}')
+            if count < 1: raise EOFError('No audio input devices were found')
+        
+            if input_device_index is None:
+                try:
+                    dev = self.get_default_input_device_info()
+                except:
+                    raise EOFError(f'No default input info or device')
+                
+            else:
+                try:
+                    int(input_device_index)
+                except ValueError:
+                    raise ValueError('invalid literal for input_device_index.')
+                
+                try:
+                    dev = self.get_device_info_by_index(input_device_index)
+                except:
+                    raise EOFError(f'No input info or device for index {input_device_index}')
+
+            try:
+                self._sample_rate = int(dev.default_sample_rate)
+                assert self._sample_rate > 0.0
+            except:
+                raise EOFError(f'Input device samplerate unsupported')
+            
+            try:
+                input_channels = int(dev.max_input_channels)
+                assert input_channels > 0
+            except:
+                raise EOFError(f'Input device channels unsupported')
+            
+            try:
+                self._input_device_index = int(dev.index)
+
+                audio_input_stream = AudioStream()
+                try:
+                    audio_input_stream.open(
+                        input_dev_index = self._input_device_index,
+                        sample_rate = self._sample_rate,
+                        format=self._sample_format,
+                        input_channels=input_channels,
+                        frames_per_buffer=self._data_chunk,
+                        enable_input=True,
+                        enable_output=False,
+                        ) 
+                finally:
+                    audio_input_stream.close()
+                
+            except Exception as e:
+                raise EOFError(f'Input device of {self._input_device_index}  {e}')
+
+
+        except EOFError as e:
+            warnings.warn(f"{e}. some features will be unavailable.")
+            self._input_device_index = None
+
+            try:
+                input_channels = int(input_dev_nchannels)  
+                assert input_channels > 0
+            except:
+                raise ValueError('Unsupported input dev channels.')
+            
+            try:
+                self._sample_rate = int(input_dev_sample_rate)  # Default sample rate
+                assert self._sample_rate > 0
+            except:
+                raise ValueError('Unsupported samplerate.')
+
+
+        try:
+            if callable(output_dev_callback):
+                self.output_dev_callback = output_dev_callback
+            try:
+                count = self.get_device_count()
+            except Exception as e:
+                raise EOFError(f'{e}')
+            if count < 1: raise EOFError('No audio output devices were found')
+            
+            if output_device_index is None:
+                try:
+                    dev = self.get_default_output_device_info()
+                except:
+                    raise EOFError(f'No default output info or device')
+                
+            else:
+                try:
+                    int(output_device_index)
+                except ValueError:
+                    raise ValueError('invalid literal for output_device_index.')
+                    
+                try:
+                    dev = self.get_device_info_by_index(output_device_index)
+                except:
+                    raise EOFError(f'No output info or device for index {output_device_index}')
+
+            try:
+                output_channels = dev.max_output_channels
+                assert output_channels > 0
+            except:
+                raise EOFError(f'Output device channels unsupported')
+            try:
+                self._output_device_index = dev.index
+
+                audio_output_stream = AudioStream()
+                try:
+                    audio_output_stream.open(
+                        output_dev_index = self._output_device_index,
+                        sample_rate = self._sample_rate,
+                        format=self._sample_format,
+                        output_channels=output_channels,
+                        frames_per_buffer=self._data_chunk,
+                        enable_input=False,
+                        enable_output=True,
+                        ) 
+                finally:
+                    audio_output_stream.close()
+                    
+            except Exception as e:
+                raise EOFError(f'Output device of {self._output_device_index} {e}')
+
+        except EOFError as e:
+            warnings.warn(f"{e}. some features will be unavailable.")
+            self._output_device_index = None
+
+            try:
+                output_channels = int(output_dev_nchannels)  
+                assert output_channels > 0
+            except:
+                raise ValueError('Unsupported output dev channels.')
 
         self._input_channels = input_channels
         self._output_channels = output_channels
         self._nchannels = self._output_channels
-  
+
         # Raise an error if no input or output device is found
         if self._nchannels == 0:
             raise ValueError('No input or output device found')
         self.mute()
         self.branch_pipe_database_min_key = 0
         self._window_type = window
-        self._nperseg = nperseg
 
         if noverlap is None:
             noverlap = nperseg // 2
@@ -202,10 +314,6 @@ class Master:
         elif self._window_type is None:
             window = None
             self._window_type = None
-        self._data_chunk = nperseg
-        self._sample_width_format_str = '<i{}'.format(self._sample_width)
-        if data_format == SampleFormat.FLOAT32.value:
-            self._sample_width_format_str = '<f{}'.format(self._sample_width)
 
         self._threads = []
         self._local_database = AudioRecordDatabase()
@@ -235,7 +343,9 @@ class Master:
         self.clean_cache()
 
 
-    def start(self):
+    def start(
+            self,
+            ):
         """
         Starts the audio input and output streams and launches any registered threads.
 
@@ -244,14 +354,17 @@ class Master:
         self : Master
             Returns the instance of the Master class for method chaining.
         """
-        
+        assert self._output_device_index, "No output device, streaming unavailable"
+        assert self._input_device_index, "No input device, streaming unavailable"
         assert not self._audio_input_stream, 'Master is Already Started'
-        self._audio_input_stream = AudioStream()
-        self._audio_output_stream = AudioStream()
+
 
         try:
+            self._audio_input_stream = AudioStream()
+            self._audio_output_stream = AudioStream()
+
             self._audio_input_stream.open(
-                input_dev_index = self._std_input_dev_id,
+                input_dev_index = self._input_device_index,
                 sample_rate = self._sample_rate,
                 format=self._sample_format,
                 input_channels=self._input_channels,
@@ -281,8 +394,6 @@ class Master:
 
         except:
             raise
-        
-        return self
 
     def _run(self, th_id):
         self._functions[self._queue.get()](th_id)
@@ -697,6 +808,8 @@ class Master:
          >>> master.echo(recorded_audio)
         """
 
+        assert self.is_started(), "instance not started, use start()"
+
         if name is None:
             name = generate_timestamp_name('record')
         elif name in self._local_database.index():
@@ -831,7 +944,7 @@ class Master:
         '''
          Determines whether the target can be synced with specified properties or not
 
-        :param target: wrapped object\s
+        :param target: wrapped objects
         :param nchannels: number of channels; if the value is None, the target will be compared to the 'self' properties.
         :param sample_rate: sample rate; if the value is None, the target will be compared to the 'self' properties.
         :param sample_format_id: if the value is None, the target will be compared to the 'self' properties.
@@ -865,7 +978,7 @@ class Master:
         '''
          Prepares a list of targets to be synchronized. Determines whether the target can be synced with specified properties or not
 
-        :param target: Targets to sync. wrapped object\s
+        :param target: Targets to sync. wrapped objects
         :param nchannels: Number of channels (default: `None`); if the value is None, the target will be compared to the 'self' properties.
         :param sample_rate: Sample rate (default: `None`); if the value is None, the target will be compared to the 'self' properties.
         :param sample_format: Sample format (default: `SampleFormat.UNKNOWN`); if the value is None, the target will be compared to the 'self' properties.
@@ -884,7 +997,7 @@ class Master:
         '''
         Synchronizes audio across multiple records. Synchronizes targets in the Wrap object format with the specified properties.
 
-        :param targets: Records to sync. wrapped object\s.
+        :param targets: Records to sync. wrapped objects.
         :param nchannels: Number of channels (default: `None`); if the value is None, the target will be synced to the 'self' properties.
         :param sample_rate: Sample rate (default: `None`); if the value is None, the target will be synced to the 'self' properties.
         :param sample_format: if the value is None, the target will be synced to the 'self' properties.
@@ -947,14 +1060,11 @@ class Master:
             streamfile_name = ''.join(tmp)
             try:
                 os.remove(streamfile_name)
-            except FileNotFoundError:
+            except (FileNotFoundError, PermissionError):
                 pass
-            except PermissionError:
-                pass
-
             try:
                 os.remove(file.name)
-            except PermissionError:
+            except (PermissionError, FileNotFoundError):
                 pass
             self._local_database.remove_record(name)
 
@@ -1131,6 +1241,9 @@ class Master:
         :param stream_mode: Streaming mode (default: `StreamMode.optimized`).
         :return: A StreamControl object
         '''
+
+        assert self.is_started(), "instance not started, use start()"
+
         # loop mode dont workes in blocking mode
         cache_head_check_size = 20
 
@@ -1247,6 +1360,7 @@ class Master:
         '''
         Unmutes the master main stream.
         '''
+        assert self.is_started(), "instance not started, use start()"
         assert not self._exstream_mode.is_set(), "stream is busy"
         self._master_mute_mode.clear()
         self._main_stream.clear()  # Clear any stale data in the stream
@@ -1256,20 +1370,37 @@ class Master:
         '''
         Checks if the audio stream is muted.
         '''
+        assert self.is_started(), "instance not started, use start()"
         return self._master_mute_mode.is_set()
 
 
     def echo(self, record: Union[Wrap, str, AudioMetadata, Generator]=None,
              enable: bool=None, main_output_enable: bool=False):
         """
-        Play "Record" on the operating system's default audio output. 
-        its also Enables or disables echoing of recorded data to the system's default output, if record is not provided.
-
-        :param record: optional, default None;
-         Record to echo (str, Wrap, AudioMetadata, or Generator) (default: `None`).
-        :param enable: Whether to enable echoing on the master's main stream (default: `None` means trigger mode).
-        :param main_output_enable: Whether to enable main stream's output while playing provided record (default: `False`).
-
+        Plays audio through your system's default speakers or web browser if system audio isn't available.
+        
+        You can use this in two ways:
+        1. Play a specific audio record (pass in the 'record' parameter)
+        2. Toggle real-time echo of incoming audio (leave 'record' as None)
+        
+        Parameters:
+        - record: The audio you want to play. Can be:
+            - A file path (str)
+            - A Wrap object
+            - AudioMetadata
+            - A Generator
+            Leave empty to control real-time echo instead
+            
+        - enable: Controls echo behavior when record is None:
+            - None: Toggles echo on/off (like a switch)
+            - True: Turns echo on
+            - False: Turns echo off
+            
+        - main_output_enable: Keep the main stream's output on while playing?
+            Defaults to False to avoid audio feedback
+            
+        Note: If system audio fails, it'll try playing through your web browser 
+        using HTML5 audio (if you're in a supported environment like Jupyter).
         """
         if record is None:
             if enable is None:
@@ -1307,24 +1438,40 @@ class Master:
                 flg = True
                 self._echo_flag.clear()
 
-            write_to_default_output(
-                data,
-                record['sampleFormat'],
-                record['nchannels'],
-                record['frameRate']
-            )
-
+            try:
+                assert self._output_device_index, "No output devices were found."
+                write_to_default_output(
+                    data,
+                    record['sampleFormat'],
+                    record['nchannels'],
+                    record['frameRate'],
+                    self._output_device_index
+                )
+            except Exception as e:
+                try:
+                    if WebAudioIO.is_web_audio_supported():
+                        result = WebAudioIO.play_audio_data(
+                            data, 
+                            record['sampleFormat'], 
+                            record['nchannels'], 
+                            record['frameRate'],
+                            )
+                        assert result
+                        warnings.warn(f'{e}')
+                    else:
+                        raise
+                except:
+                    raise RuntimeError(f"{e}")
+                    
             if flg:
                 self._echo_flag.set()
-
-        # self.clean_cache()
-        # return Generator(record)
 
     def disable_echo(self):
         '''
         Disables the echo functionality.
         '''
-        return  self.echo(enable=False)
+        assert self.is_started(), "instance not started, use start()"
+        self.echo(enable=False)
 
 
     def wrap(self, record: Union[str, AudioMetadata]):
@@ -1356,20 +1503,47 @@ class Master:
 
         return listdir
 
-    def clean_cache(self):
+    def clean_cache(self, max_retries = 3, retry_delay = .1):
         '''
-         The audio data maintaining process has additional cached files to reduce dynamic
-         memory usage and improve performance, meaning that, The audio data storage methods
-         can have different execution times based on the cached files.
-         This function used to clean the audio cache by removing cached files.
+        The audio data maintaining process has additional cached files to reduce dynamic
+        memory usage and improve performance, meaning that, The audio data storage methods
+        can have different execution times based on the cached files.
+        This function used to clean the audio cache by removing cached files.
+        
+        The function implements retry logic for handling permission errors and ensures
+        files are properly deleted across different operating systems.
         '''
         cache = self._cache()
-        for i in cache:
-            try:
-                os.remove(i)
-            except PermissionError:
-                pass
-        return self
+        
+        for file_path in cache:
+            path = Path(file_path)
+            if not path.exists():
+                continue
+                
+            for attempt in range(max_retries):
+                try:
+                    try:
+                        path.chmod(0o666)
+                    except:
+                        pass
+                        
+                    path.unlink(missing_ok=True)
+                    break  # Success - exit retry loop
+                    
+                except PermissionError:
+                    if attempt < max_retries - 1:
+                        # Wait before retry to allow potential file locks to clear
+                        time.sleep(retry_delay)
+                        continue
+                        
+                except OSError as e:
+                    # Handle other OS-specific errors
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        break
+        time.sleep(retry_delay)
 
 
     def _refresh(self, *args):
@@ -1435,12 +1609,14 @@ class Master:
         Disables standard input stream by acquiring the main stream's lock object.
         """
         # if not self._main_stream.locked():
+        assert self.is_started(), "instance not started, use start()"
         self._main_stream.acquire()
 
     def enable_std_input(self):
         """
         Enables standard input stream by clearing the main stream's lock.
         """
+        assert self.is_started(), "instance not started, use start()"
         if self._main_stream.locked():
             self._main_stream.clear()
             self._main_stream.release()
@@ -1505,6 +1681,9 @@ class Master:
         '''
         sets the main processing pipeline.
         '''
+
+        assert self.is_started(), "instance not started, use start()"
+
         if type(stream) is str:
             name = stream
         else:
@@ -1554,6 +1733,8 @@ class Master:
         '''
         Disables the current processing pipeline.
         '''
+
+        assert self.is_started(), "instance not started, use start()"
         if self._main_stream and hasattr(self._main_stream, 'pip'):
             self._main_stream.acquire()
             if isinstance(self._main_stream.pip, Pipeline):
@@ -1570,6 +1751,8 @@ class Master:
         '''
         Clears all pipeline's data.
         '''
+
+        assert self.is_started(), "instance not started, use start()"
         if self._main_stream:
             self._main_stream.clear()
         for pipeline in self.main_pipe_database:
@@ -1673,6 +1856,7 @@ class Master:
         :param noverlap: Number of overlapping segments (default: `None`).
         :param NOLA_check: Perform the NOLA check (default: `True`).
         '''
+        assert self.is_started(), "instance not started, use start()"
 
         if self._window_type == window and self._noverlap == noverlap:
             return

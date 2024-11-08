@@ -264,8 +264,7 @@ class Generator:
             self._file.close()
         try:
             self._parent.del_record(self.name)
-        except ValueError:
-            # 404: Record not found
+        except (ValueError):
             pass
         if os.path.exists(self._file.name):
             try:

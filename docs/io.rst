@@ -270,7 +270,35 @@ Here are some examples of how to use these encoding functions:
   codec.encode_vorbis_file("output.ogg", vorbis_data, SampleFormat.FLOAT32, 2, 44100, quality=0.8)
 ```
 
-These examples demonstrate basic usage of each encoding function. Remember to replace the placeholder audio data with your actual raw audio bytes.
+sudio.io.codec.encode_to_wav(data, format, nchannels, sample_rate)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Encodes raw audio data into a WAV format.
+
+Parameters:
+  - **data** (bytes): Raw audio data to be encoded.
+  - **format** (SampleFormat): Audio sample format (e.g., `ma_format_s16`).
+  - **nchannels** (int): Number of audio channels (e.g., 1 for mono, 2 for stereo).
+  - **sample_rate** (int): Sample rate in Hz (e.g., 44100 for CD quality).
+
+Returns:
+  bytes: Encoded WAV data in bytes format.
+
+sudio.io.codec.encode_to_mp3(data, format, nchannels, sample_rate, bitrate=128, quality=5)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Encodes raw audio data into an MP3 format.
+
+Parameters:
+  - **data** (bytes): Raw audio data to be encoded.
+  - **format** (SampleFormat): Audio sample format (e.g., `ma_format_s16`).
+  - **nchannels** (int): Number of audio channels (e.g., 1 for mono, 2 for stereo).
+  - **sample_rate** (int): Sample rate in Hz (e.g., 44100 for CD quality).
+  - **bitrate** (int, optional): MP3 encoding bitrate in kbps. Defaults to 128.
+  - **quality** (int, optional): MP3 encoding quality (0-9, where 0 is best and 9 is worst). Defaults to 5.
+
+Returns:
+  bytes: Encoded MP3 data in bytes format.
 
 
 
@@ -354,3 +382,10 @@ The callback should return a tuple containing:
 
 1. The output audio data as bytes.
 2. A boolean flag indicating whether to continue streaming (**True**) or stop (**False**).
+
+
+
+.. automodule:: sudio.io._webio
+   :members:
+   :undoc-members:
+   :show-inheritance:

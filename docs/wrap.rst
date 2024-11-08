@@ -21,7 +21,7 @@ Wrap Module
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: sudio.wrap.wrapgenerator
+.. automodule:: sudio.wrap.generator
    :members:
    :undoc-members:
    :show-inheritance:

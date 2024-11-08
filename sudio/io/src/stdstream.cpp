@@ -7,23 +7,37 @@
  -- file stdstream.cpp
 */
 #include "stdstream.hpp"
-#include <stdexcept>
+#include "alsa_suppressor.hpp"
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <sstream>
+
 
 namespace stdstream {
 
+
+inline std::string createErrorMessage(const std::string& context, PaError error) {
+    std::stringstream ss;
+    ss << context << ": " << Pa_GetErrorText(error);
+    return ss.str();
+}
+
 AudioStream::AudioStream() : stream(nullptr), isBlockingMode(false), inputEnabled(false), outputEnabled(false) {
+    suio::AlsaErrorSuppressor suppressor;
     PaError err = Pa_Initialize();
     if (err != paNoError) {
-        throw std::runtime_error("PortAudio initialization failed: " + std::string(Pa_GetErrorText(err)));
+        throw AudioInitException(createErrorMessage(" initialization failed", err));
     }
 }
 
 AudioStream::~AudioStream() {
     if (stream) {
-        close();
+        try {
+            close();
+        } catch (const AudioException& e) {
+            // pass
+        }
     }
     Pa_Terminate();
 }
@@ -35,42 +49,93 @@ void AudioStream::open(int inputDeviceIndex, int outputDeviceIndex,
                        bool enableOutput, PaStreamFlags streamFlags,
                        InputCallback inputCallback,
                        OutputCallback outputCallback) {
+    
     PaStreamParameters inputParameters, outputParameters;
     PaStreamParameters *inputParamsPtr = nullptr;
     PaStreamParameters *outputParamsPtr = nullptr;
+    double inputSampleRate, outputSampleRate;
     
     if (!enableInput && !enableOutput) {
-        throw std::runtime_error("At least one of input or output must be enabled");
+        throw InvalidParameterException("At least one of input or output must be enabled");
     }
 
     inputEnabled = enableInput;
     outputEnabled = enableOutput;
     
     if (enableInput) {
-        if (inputDeviceIndex == -1) inputDeviceIndex = Pa_GetDefaultInputDevice();
+        if (inputDeviceIndex == -1) {
+            inputDeviceIndex = Pa_GetDefaultInputDevice();
+            if (inputDeviceIndex == paNoDevice) {
+                throw DeviceException("No default input device available");
+            }
+        } else if (inputDeviceIndex >= Pa_GetDeviceCount()) {
+            throw InvalidParameterException("Invalid input device index: " + std::to_string(inputDeviceIndex));
+        }
+
         const PaDeviceInfo* inputInfo = Pa_GetDeviceInfo(inputDeviceIndex);
+        if (!inputInfo) {
+            throw DeviceException("Failed to get input device info for index: " + std::to_string(inputDeviceIndex));
+        }
+        
+        if (inputInfo->maxInputChannels == 0) {
+            throw ResourceException("Selected device does not support input: " + std::string(inputInfo->name));
+        }
+
+        if (inputChannels > inputInfo->maxInputChannels) {
+            throw InvalidParameterException("Requested input channels (" + 
+                std::to_string(inputChannels) + ") exceed device maximum (" + 
+                std::to_string(inputInfo->maxInputChannels) + ")");
+        }
+
         inputParameters.device = inputDeviceIndex;
         inputParameters.channelCount = inputChannels > 0 ? inputChannels : inputInfo->maxInputChannels;
         inputParameters.sampleFormat = format;
         inputParameters.suggestedLatency = inputInfo->defaultLowInputLatency;
         inputParameters.hostApiSpecificStreamInfo = nullptr;
         inputParamsPtr = &inputParameters;
+        inputSampleRate = inputInfo->defaultSampleRate;
     }
 
     if (enableOutput) {
-        if (outputDeviceIndex == -1) outputDeviceIndex = Pa_GetDefaultOutputDevice();
+        if (outputDeviceIndex == -1) {
+            outputDeviceIndex = Pa_GetDefaultOutputDevice();
+            if (outputDeviceIndex == paNoDevice) {
+                throw DeviceException("No default output device available");
+            }
+        } else if (outputDeviceIndex >= Pa_GetDeviceCount()) {
+            throw InvalidParameterException("Invalid output device index: " + std::to_string(outputDeviceIndex));
+        }
+
         const PaDeviceInfo* outputInfo = Pa_GetDeviceInfo(outputDeviceIndex);
+        if (!outputInfo) {
+            throw DeviceException("Failed to get output device info for index: " + std::to_string(outputDeviceIndex));
+        }
+        
+        if (outputInfo->maxOutputChannels == 0) {
+            throw ResourceException("Selected device does not support output: " + std::string(outputInfo->name));
+        }
+
+        if (outputChannels > outputInfo->maxOutputChannels) {
+            throw InvalidParameterException("Requested output channels (" + 
+                std::to_string(outputChannels) + ") exceed device maximum (" + 
+                std::to_string(outputInfo->maxOutputChannels) + ")");
+        }
+
         outputParameters.device = outputDeviceIndex;
         outputParameters.channelCount = outputChannels > 0 ? outputChannels : outputInfo->maxOutputChannels;
         outputParameters.sampleFormat = format;
         outputParameters.suggestedLatency = outputInfo->defaultHighOutputLatency;
         outputParameters.hostApiSpecificStreamInfo = nullptr;
         outputParamsPtr = &outputParameters;
+        outputSampleRate = outputInfo->defaultSampleRate;
+
     }
 
-    if (sampleRate == 0) {
-        sampleRate = enableInput ? Pa_GetDeviceInfo(inputDeviceIndex)->defaultSampleRate :
-                                   Pa_GetDeviceInfo(outputDeviceIndex)->defaultSampleRate;
+    if (sampleRate < 0){
+        throw InvalidParameterException("Invalid sample rate: " + std::to_string(sampleRate));
+    }
+    else if (sampleRate == 0) {
+        sampleRate = enableInput ? inputSampleRate: outputSampleRate;
     }
 
     userInputCallback = inputCallback;
@@ -85,11 +150,11 @@ void AudioStream::open(int inputDeviceIndex, int outputDeviceIndex,
     PaError err = Pa_OpenStream(&stream, inputParamsPtr, outputParamsPtr, sampleRate, framesPerBuffer, 
                                 streamFlags, callbackPtr, this);
     if (err != paNoError) {
-        throw std::runtime_error("Failed to open PortAudio stream: " + std::string(Pa_GetErrorText(err)));
+        throw StreamException(createErrorMessage("Failed to open  stream", err));
     }
 
     if (!stream) {
-        throw std::runtime_error("Failed to create a valid PortAudio stream");
+        throw StreamException("Failed to create a valid  stream");
     }
 
     streamFormat = format;
@@ -102,7 +167,7 @@ void AudioStream::start() {
     }
     PaError err = Pa_StartStream(stream);
     if (err != paNoError) {
-        throw std::runtime_error("Failed to start PortAudio stream: " + std::string(Pa_GetErrorText(err)));
+        throw std::runtime_error("Failed to start  stream: " + std::string(Pa_GetErrorText(err)));
     }
 }
 
@@ -110,7 +175,7 @@ void AudioStream::stop() {
     if (stream) {
         PaError err = Pa_StopStream(stream);
         if (err != paNoError) {
-            std::cerr << "Warning: Failed to stop PortAudio stream: " << Pa_GetErrorText(err) << std::endl;
+            std::cerr << "Warning: Failed to stop  stream: " << Pa_GetErrorText(err) << std::endl;
         }
     }
 }
@@ -120,7 +185,7 @@ void AudioStream::close() {
         stop();
         PaError err = Pa_CloseStream(stream);
         if (err != paNoError) {
-            std::cerr << "Warning: Failed to close PortAudio stream: " << Pa_GetErrorText(err) << std::endl;
+            std::cerr << "Warning: Failed to close  stream: " << Pa_GetErrorText(err) << std::endl;
         }
         stream = nullptr;
     }
@@ -130,20 +195,36 @@ void AudioStream::close() {
 std::vector<AudioDeviceInfo> AudioStream::getInputDevices() {
     std::vector<AudioDeviceInfo> devices;
     int numDevices = Pa_GetDeviceCount();
+    if (numDevices <= 0) {
+        throw DeviceException(createErrorMessage("Failed to get device count or no device", numDevices));
+    }
     int defaultInputDevice = Pa_GetDefaultInputDevice();
+    if (defaultInputDevice == paNoDevice) {
+        throw DeviceException("No default input device");
+    }
 
     for (int i = 0; i < numDevices; i++) {
-        const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(i);
-        if (deviceInfo->maxInputChannels > 0) {
-            devices.push_back({
-                i,
-                deviceInfo->name,
-                deviceInfo->maxInputChannels,
-                deviceInfo->maxOutputChannels,
-                deviceInfo->defaultSampleRate,
-                (i == defaultInputDevice),
-                false
-            });
+        try {
+            const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(i);
+            if (!deviceInfo) {
+                throw DeviceException("Unable to get device info for index " + std::to_string(i));
+            }
+
+            if (deviceInfo->maxInputChannels > 0) {
+                devices.push_back({
+                    i,
+                    deviceInfo->name,
+                    deviceInfo->maxInputChannels,
+                    deviceInfo->maxOutputChannels,
+                    deviceInfo->defaultSampleRate,
+                    (i == defaultInputDevice),
+                    false
+                });
+            }
+        } catch (const DeviceException& e) {
+            // Log error but continue enumerating other devices
+            std::cerr << "Warning: " << e.what() << std::endl;
+            continue;
         }
     }
     return devices;
@@ -152,20 +233,35 @@ std::vector<AudioDeviceInfo> AudioStream::getInputDevices() {
 std::vector<AudioDeviceInfo> AudioStream::getOutputDevices() {
     std::vector<AudioDeviceInfo> devices;
     int numDevices = Pa_GetDeviceCount();
+    if (numDevices <= 0) {
+        throw DeviceException(createErrorMessage("Failed to get device count or no device", numDevices));
+    }
     int defaultOutputDevice = Pa_GetDefaultOutputDevice();
-
+    if (defaultOutputDevice == paNoDevice) {
+        throw DeviceException("No default output device");
+    }
+    
     for (int i = 0; i < numDevices; i++) {
-        const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(i);
-        if (deviceInfo->maxOutputChannels > 0) {
-            devices.push_back({
-                i,
-                deviceInfo->name,
-                deviceInfo->maxInputChannels,
-                deviceInfo->maxOutputChannels,
-                deviceInfo->defaultSampleRate,
-                false,
-                (i == defaultOutputDevice)
-            });
+        try {
+            const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(i);
+            if (!deviceInfo) {
+                throw DeviceException("Unable to get device info for index " + std::to_string(i));
+            }
+
+            if (deviceInfo->maxOutputChannels > 0) {
+                devices.push_back({
+                    i,
+                    deviceInfo->name,
+                    deviceInfo->maxInputChannels,
+                    deviceInfo->maxOutputChannels,
+                    deviceInfo->defaultSampleRate,
+                    false,
+                    (i == defaultOutputDevice)
+                });
+            }
+        } catch (const DeviceException& e) {
+            std::cerr << "Warning: " << e.what() << std::endl;
+            continue;
         }
     }
     return devices;
@@ -173,7 +269,13 @@ std::vector<AudioDeviceInfo> AudioStream::getOutputDevices() {
 
 AudioDeviceInfo AudioStream::getDefaultInputDevice() {
     int defaultInputDevice = Pa_GetDefaultInputDevice();
+    if (defaultInputDevice == paNoDevice) {
+        throw DeviceException("No default input device");
+    }
     const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(defaultInputDevice);
+    if (!deviceInfo) {
+        throw DeviceException("Unable to get device info for index " + std::to_string(defaultInputDevice));
+    }
     return {
         defaultInputDevice,
         deviceInfo->name,
@@ -187,7 +289,13 @@ AudioDeviceInfo AudioStream::getDefaultInputDevice() {
 
 AudioDeviceInfo AudioStream::getDefaultOutputDevice() {
     int defaultOutputDevice = Pa_GetDefaultOutputDevice();
+    if (defaultOutputDevice == paNoDevice) {
+        throw DeviceException("No default output device");
+    }
     const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(defaultOutputDevice);
+    if (!deviceInfo) {
+        throw DeviceException("Unable to get device info for index " + std::to_string(defaultOutputDevice));
+    }
     return {
         defaultOutputDevice,
         deviceInfo->name,
@@ -230,20 +338,21 @@ long AudioStream::readStream(uint8_t* buffer, unsigned long frames) {
 }
 
 long AudioStream::writeStream(const uint8_t* buffer, unsigned long frames) {
+
     if (!stream) {
-        throw std::runtime_error("Stream is not open");
+        throw StreamException("Stream is not open");
     }
-    if (!isBlockingMode) {
-        throw std::runtime_error("Write operation is only available in blocking mode");
+    else if (!isBlockingMode) {
+        throw InvalidParameterException("Write operation is only available in blocking mode");
     }
-    if (!outputEnabled) {
-        throw std::runtime_error("Output is not enabled for this stream");
+    else if (!outputEnabled) {
+        throw InvalidParameterException("Output is not enabled for this stream");
     }
-    if (frames == 0) {
+    else if (!buffer) {
+        throw InvalidParameterException("Invalid buffer pointer");
+    }
+    else if (frames == 0) {
         return 0;  // No frames to write
-    }
-    if (!buffer) {
-        throw std::runtime_error("Invalid buffer pointer");
     }
 
     unsigned long framesWritten = 0;
@@ -252,7 +361,10 @@ long AudioStream::writeStream(const uint8_t* buffer, unsigned long frames) {
     while (framesWritten < frames) {
         long availableFrames = Pa_GetStreamWriteAvailable(stream);
 
-        if (availableFrames == 0) {
+        if (availableFrames < 0) {
+            throw StreamException(createErrorMessage("Error getting available write frames", availableFrames));
+        }
+        else if (availableFrames == 0) {
             // No space available, wait a bit
             Pa_Sleep(1);
             continue;
@@ -267,7 +379,7 @@ long AudioStream::writeStream(const uint8_t* buffer, unsigned long frames) {
                 Pa_Sleep(1);
                 continue;
             } else {
-                throw std::runtime_error("Error writing to stream: " + std::string(Pa_GetErrorText(err)));
+                throw StreamException(createErrorMessage("Error writing to stream", err));
             }
         }
 
@@ -325,9 +437,13 @@ int AudioStream::getDeviceCount() {
 }
 
 AudioDeviceInfo AudioStream::getDeviceInfoByIndex(int index) {
+
+    if(index < 0){
+        throw std::range_error("Index is out of range");
+    }
     const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(index);
     if (!deviceInfo) {
-        throw std::runtime_error("Invalid device index");
+        throw DeviceException("Unable to get device info for index " + std::to_string(index));
     }
 
     AudioDeviceInfo info;
@@ -344,23 +460,32 @@ AudioDeviceInfo AudioStream::getDeviceInfoByIndex(int index) {
 
 
 
-void writeToDefaultOutput(const std::vector<uint8_t>& data, PaSampleFormat sampleFormat, 
-                          int channels, double sampleRate) {
+void writeToDefaultOutput(
+    const std::vector<uint8_t>& data, 
+    PaSampleFormat sampleFormat, 
+    int channels, 
+    double sampleRate,
+    int outputDeviceIndex
+    ){
+
+    suio::AlsaErrorSuppressor suppressor;
     PaError err = Pa_Initialize();
     if (err != paNoError) {
-        throw std::runtime_error("PortAudio initialization failed: " + std::string(Pa_GetErrorText(err)));
+        throw AudioInitException(createErrorMessage("initialization failed", err));
     }
 
-    int outputDeviceIndex = Pa_GetDefaultOutputDevice();
+    if(outputDeviceIndex < 0)
+        outputDeviceIndex = Pa_GetDefaultOutputDevice();
+
     if (outputDeviceIndex == paNoDevice) {
         Pa_Terminate();
-        throw std::runtime_error("No default output device found");
+        throw DeviceException("No default input device available");
     }
 
     const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(outputDeviceIndex);
     if (!deviceInfo) {
         Pa_Terminate();
-        throw std::runtime_error("Failed to get device info for default output device");
+        throw DeviceException("Failed to get device info");
     }
 
     if (channels <= 0) channels = deviceInfo->maxOutputChannels;
@@ -377,15 +502,19 @@ void writeToDefaultOutput(const std::vector<uint8_t>& data, PaSampleFormat sampl
     err = Pa_OpenStream(&stream, nullptr, &outputParameters, sampleRate, paFramesPerBufferUnspecified, 
                         paClipOff, nullptr, nullptr);
     if (err != paNoError) {
-        Pa_Terminate();
-        throw std::runtime_error("Failed to open PortAudio stream: " + std::string(Pa_GetErrorText(err)));
+        throw StreamException(createErrorMessage("Failed to open stream", err));
+    }
+
+    if (!stream) {
+        throw StreamException("Failed to create a valid stream");
     }
 
     err = Pa_StartStream(stream);
     if (err != paNoError) {
         Pa_CloseStream(stream);
         Pa_Terminate();
-        throw std::runtime_error("Failed to start PortAudio stream: " + std::string(Pa_GetErrorText(err)));
+
+        throw StreamException("Failed to start  stream: " + std::string(Pa_GetErrorText(err)));
     }
 
     const uint8_t* buffer = data.data();
@@ -422,13 +551,13 @@ void writeToDefaultOutput(const std::vector<uint8_t>& data, PaSampleFormat sampl
     if (err != paNoError) {
         Pa_CloseStream(stream);
         Pa_Terminate();
-        throw std::runtime_error("Error stopping stream: " + std::string(Pa_GetErrorText(err)));
+        throw StreamException("Error stopping stream: " + std::string(Pa_GetErrorText(err)));
     }
 
     err = Pa_CloseStream(stream);
     if (err != paNoError) {
         Pa_Terminate();
-        throw std::runtime_error("Error closing stream: " + std::string(Pa_GetErrorText(err)));
+        throw StreamException("Error closing stream: " + std::string(Pa_GetErrorText(err)));
     }
 
     Pa_Terminate();

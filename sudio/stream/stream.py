@@ -98,13 +98,7 @@ class Stream:
                 self._data_indexer = lambda data: data
         else:
             pass
-            # obj.insert(0, np.vectorize(other._multi_channel_windowing, signature=''))
-            # pickle.dumps(obj._config['authkey'])
-            # reserved for next versions
-            # self.put = obj.put_nowait
-            # self.clear = obj.queue.clear
-            # self.get = lambda: other._multi_channel_windowing(obj.get())
-            # self.sget = obj.get
+
 
     def acquire(self):
         '''

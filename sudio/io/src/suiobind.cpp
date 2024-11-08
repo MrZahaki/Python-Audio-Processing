@@ -125,23 +125,74 @@ PYBIND11_MODULE(suio, m) {
         suio::AudioCodec::encodeWavFile(filename, vec, format, nchannels, sampleRate);
     });
 
+    codec.def("encode_to_wav", [](py::bytes data, ma_format format, uint32_t nchannels, uint32_t sampleRate) {
+        py::buffer_info info(py::buffer(data).request());
+        std::vector<uint8_t> byteData(static_cast<uint8_t*>(info.ptr), 
+                                    static_cast<uint8_t*>(info.ptr) + info.size);
+        auto wavData = suio::AudioCodec::encodeToWav(byteData, format, nchannels, sampleRate);
+        return py::bytes(reinterpret_cast<char*>(wavData.data()), wavData.size());
+    },
+    py::arg("data"),
+    py::arg("format") = ma_format_s16,
+    py::arg("nchannels") = 2,
+    py::arg("sample_rate") = 44100
+    );
+
     codec.def("encode_mp3_file", [](const std::string& filename, py::bytes data, ma_format format, uint32_t nchannels, uint32_t sampleRate, int bitrate, int quality) {
         py::buffer_info info(py::buffer(data).request());
         std::vector<uint8_t> vec(static_cast<uint8_t*>(info.ptr), static_cast<uint8_t*>(info.ptr) + info.size);
         return suio::AudioCodec::encodeMP3File(filename, vec, format, nchannels, sampleRate, bitrate, quality);
-    }, py::arg("filename"), py::arg("data"), py::arg("format"), py::arg("nchannels"), py::arg("sample_rate"), py::arg("bitrate") = 128, py::arg("quality") = 2);
+    }, 
+    py::arg("filename"), 
+    py::arg("data"), 
+    py::arg("format"), 
+    py::arg("nchannels"), 
+    py::arg("sample_rate"), 
+    py::arg("bitrate") = 128, 
+    py::arg("quality") = 5
+    );
+
+    codec.def("encode_to_mp3", [](py::bytes data, ma_format format, uint32_t nchannels, uint32_t sampleRate, 
+                             int bitrate, int quality) {
+        py::buffer_info info(py::buffer(data).request());
+        std::vector<uint8_t> byteData(static_cast<uint8_t*>(info.ptr), 
+                                    static_cast<uint8_t*>(info.ptr) + info.size);
+        auto mp3Data = suio::AudioCodec::encodeToMP3(byteData, format, nchannels, sampleRate, bitrate, quality);
+        return py::bytes(reinterpret_cast<char*>(mp3Data.data()), mp3Data.size());
+    },
+    py::arg("data"),
+    py::arg("format") = ma_format_s16,
+    py::arg("nchannels") = 2,
+    py::arg("sample_rate") = 44100,
+    py::arg("bitrate") = 128,
+    py::arg("quality") = 5
+    );
 
     codec.def("encode_flac_file", [](const std::string& filename, py::bytes data, ma_format format, uint32_t nchannels, uint32_t sampleRate, int compressionLevel) {
         py::buffer_info info(py::buffer(data).request());
         std::vector<uint8_t> vec(static_cast<uint8_t*>(info.ptr), static_cast<uint8_t*>(info.ptr) + info.size);
         return suio::AudioCodec::encodeFlacFile(filename, vec, format, nchannels, sampleRate, compressionLevel);
-    }, py::arg("filename"), py::arg("data"), py::arg("format"), py::arg("nchannels"), py::arg("sample_rate"), py::arg("compression_level") = 5);
+    }, 
+    py::arg("filename"), 
+    py::arg("data"), 
+    py::arg("format"), 
+    py::arg("nchannels"), 
+    py::arg("sample_rate"), 
+    py::arg("compression_level") = 5
+    );
 
     codec.def("encode_vorbis_file", [](const std::string& filename, py::bytes data, ma_format format, uint32_t nchannels, uint32_t sampleRate, float quality) {
         py::buffer_info info(py::buffer(data).request());
         std::vector<uint8_t> vec(static_cast<uint8_t*>(info.ptr), static_cast<uint8_t*>(info.ptr) + info.size);
         return suio::AudioCodec::encodeVorbisFile(filename, vec, format, nchannels, sampleRate, quality);
-    }, py::arg("filename"), py::arg("data"), py::arg("format"), py::arg("nchannels"), py::arg("sample_rate"), py::arg("quality") = 0.4);
+    }, 
+    py::arg("filename"), 
+    py::arg("data"), 
+    py::arg("format"), 
+    py::arg("nchannels"), 
+    py::arg("sample_rate"), 
+    py::arg("quality") = 0.4
+    );
 
 
     codec.def(
@@ -385,8 +436,13 @@ PYBIND11_MODULE(suio, m) {
     .def("get_stream_write_available", &stdstream::AudioStream::getStreamWriteAvailable);
 
 
-    m.def("write_to_default_output", [](py::bytes data, 
-                                        ma_format format, py::object channels, py::object sample_rate) {
+    m.def("write_to_default_output", [](
+        py::bytes data, 
+        ma_format format, 
+        py::object channels, 
+        py::object sample_rate,
+        py::object output_device_index
+        ) {
         // Convert py::bytes to std::vector<uint8_t>
         py::buffer_info info(py::buffer(data).request());
         std::vector<uint8_t> byteData(static_cast<uint8_t*>(info.ptr), static_cast<uint8_t*>(info.ptr) + info.size);
@@ -403,9 +459,22 @@ PYBIND11_MODULE(suio, m) {
 
         int nChannels = channels.is_none() ? 0 : channels.cast<int>();
         double sampleRate = sample_rate.is_none() ? 0.0 : sample_rate.cast<double>();
+        int outputDeviceIndex = output_device_index.is_none() ? -1 : output_device_index.cast<int>();
 
-        stdstream::writeToDefaultOutput(byteData, paFormat, nChannels, sampleRate);
-    }, py::arg("data"), py::arg("format") = ma_format_f32, py::arg("channels") = py::none(), py::arg("sample_rate") = py::none());
+        stdstream::writeToDefaultOutput(
+            byteData, 
+            paFormat, 
+            nChannels, 
+            sampleRate, 
+            outputDeviceIndex
+            );
+    }, 
+    py::arg("data"), 
+    py::arg("format") = ma_format_f32, 
+    py::arg("channels") = py::none(), 
+    py::arg("sample_rate") = py::none(),
+    py::arg("output_device_index") = py::none()
+    );
 
 
     m.def("get_sample_size", [](ma_format format) {

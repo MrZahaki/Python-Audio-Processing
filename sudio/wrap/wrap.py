@@ -344,7 +344,6 @@ class Wrap:
                 else:
                     return buffer
 
-                # iir = scisig.firwin(50, freq, fs=self.sample_rate)
 
                 # print(btype)
                 iir = scisig.iirfilter(filt['order'], freq, btype=btype, fs=self._sample_rate, output='sos',

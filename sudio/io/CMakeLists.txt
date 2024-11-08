@@ -129,6 +129,7 @@ pybind11_add_module(sudio_io
     src/codec.cpp
     src/stdstream.cpp
     src/suiobind.cpp
+    src/alsa_suppressor.cpp
 )
 
 # Include directories

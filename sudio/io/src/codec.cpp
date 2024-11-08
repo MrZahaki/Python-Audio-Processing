@@ -134,6 +134,69 @@ std::vector<uint8_t> AudioCodec::decodeVorbisFile(const std::string& filename,
 }
 
 
+std::vector<uint8_t> AudioCodec::encodeToWav(
+        const std::vector<uint8_t>& data,
+        ma_format format,
+        uint32_t nchannels,
+        uint32_t sampleRate) {
+        
+        ma_encoder encoder;
+        std::vector<uint8_t> encodedData;
+        ma_uint64 framesWritten;
+        
+        // encoder configuration
+        ma_encoder_config config = ma_encoder_config_init(
+            ma_encoding_format_wav,
+            format,
+            nchannels,
+            sampleRate
+        );
+
+        // write callback
+        ma_encoder_write_proc onWrite = [](ma_encoder* pEncoder, const void* pBufferIn, size_t bytesToWrite, size_t* pBytesWritten) -> ma_result {
+            auto* buffer = static_cast<std::vector<uint8_t>*>(pEncoder->pUserData);
+            const uint8_t* byteData = static_cast<const uint8_t*>(pBufferIn);
+            buffer->insert(buffer->end(), byteData, byteData + bytesToWrite);
+            *pBytesWritten = bytesToWrite;
+            return MA_SUCCESS;
+        };
+
+        // seek callback
+        ma_encoder_seek_proc onSeek = [](ma_encoder* pEncoder, ma_int64 offset, ma_seek_origin origin) -> ma_result {
+            return MA_SUCCESS; // Allow seeking 
+        };
+
+        ma_result result = ma_encoder_init(
+            onWrite,
+            onSeek,
+            &encodedData,  // User data that will be accessible in callbacks
+            &config,
+            &encoder
+        );
+
+        if (result != MA_SUCCESS) {
+            throw std::runtime_error("Failed to initialize WAV encoder");
+        }
+
+        ma_uint64 frameCount = data.size() / (nchannels * ma_get_bytes_per_sample(format));
+
+        result = ma_encoder_write_pcm_frames(&encoder, data.data(), frameCount, &framesWritten);
+        
+        if (result != MA_SUCCESS) {
+            ma_encoder_uninit(&encoder);
+            throw std::runtime_error("Failed to encode WAV data");
+        }
+
+        if (framesWritten != frameCount) {
+            ma_encoder_uninit(&encoder);
+            throw std::runtime_error("Failed to write all frames");
+        }
+
+        // Cleanup
+        ma_encoder_uninit(&encoder);
+        return encodedData;
+    }
+
 
 
 uint64_t AudioCodec::encodeWavFile(const std::string& filename,
@@ -272,6 +335,97 @@ uint64_t AudioCodec::encodeMP3File(const std::string& filename,
 
     return totalFramesWritten;
 }
+
+std::vector<uint8_t> AudioCodec::encodeToMP3(
+    const std::vector<uint8_t>& data,
+    ma_format format,
+    uint32_t nchannels,
+    uint32_t sampleRate,
+    int bitrate = 128,
+    int quality = 2) {
+    
+    lame_t lame = lame_init();
+    if (!lame) {
+        throw std::runtime_error("Failed to initialize LAME encoder");
+    }
+
+    lame_set_num_channels(lame, nchannels);
+    lame_set_in_samplerate(lame, sampleRate);
+    lame_set_brate(lame, bitrate);
+    lame_set_quality(lame, quality);
+
+    if (lame_init_params(lame) < 0) {
+        lame_close(lame);
+        throw std::runtime_error("Failed to set LAME parameters");
+    }
+
+    std::vector<uint8_t> mp3Data;
+    const int PCM_SIZE = 8192;
+    const int MP3_SIZE = 8192;
+    std::vector<float> pcm_buffer(PCM_SIZE * 2);
+    std::vector<uint8_t> mp3_buffer(MP3_SIZE);
+
+    size_t bytesPerSample = ma_get_bytes_per_sample(format);
+    size_t frameSize = nchannels * bytesPerSample;
+    size_t totalFrames = data.size() / frameSize;
+
+    for (size_t i = 0; i < totalFrames; i += PCM_SIZE) {
+        size_t framesToProcess = std::min(static_cast<size_t>(PCM_SIZE), totalFrames - i);
+        
+        // Convert input data to float
+        for (size_t j = 0; j < framesToProcess * nchannels; ++j) {
+            size_t dataIndex = (i * frameSize) + (j * bytesPerSample);
+            float sample;
+            switch (format) {
+                case ma_format_u8:
+                    sample = (*reinterpret_cast<const uint8_t*>(&data[dataIndex]) - 128) / 128.0f;
+                    break;
+                case ma_format_s16:
+                    sample = *reinterpret_cast<const int16_t*>(&data[dataIndex]) / 32768.0f;
+                    break;
+                case ma_format_s24: {
+                    int32_t sample24 = (data[dataIndex] << 8) | (data[dataIndex + 1] << 16) | (data[dataIndex + 2] << 24);
+                    sample = static_cast<float>(sample24) / 8388608.0f;
+                    break;
+                }
+                case ma_format_s32:
+                    sample = *reinterpret_cast<const int32_t*>(&data[dataIndex]) / 2147483648.0f;
+                    break;
+                case ma_format_f32:
+                    sample = *reinterpret_cast<const float*>(&data[dataIndex]);
+                    break;
+                default:
+                    throw std::runtime_error("Unsupported sample format");
+            }
+            pcm_buffer[j] = sample;
+        }
+
+        int bytesEncoded;
+        if (nchannels == 1) {
+            bytesEncoded = lame_encode_buffer_ieee_float(lame, pcm_buffer.data(), nullptr, framesToProcess, mp3_buffer.data(), MP3_SIZE);
+        } else {
+            bytesEncoded = lame_encode_buffer_interleaved_ieee_float(lame, pcm_buffer.data(), framesToProcess, mp3_buffer.data(), MP3_SIZE);
+        }
+
+        if (bytesEncoded < 0) {
+            lame_close(lame);
+            throw std::runtime_error("MP3 encoding failed");
+        }
+
+        mp3Data.insert(mp3Data.end(), mp3_buffer.begin(), mp3_buffer.begin() + bytesEncoded);
+    }
+
+    // Flush the encoder
+    std::vector<uint8_t> flush_buffer(MP3_SIZE);
+    int flush_result = lame_encode_flush(lame, flush_buffer.data(), MP3_SIZE);
+    if (flush_result > 0) {
+        mp3Data.insert(mp3Data.end(), flush_buffer.begin(), flush_buffer.begin() + flush_result);
+    }
+
+    lame_close(lame);
+    return mp3Data;
+}
+
 
 uint64_t AudioCodec::encodeFlacFile(const std::string& filename,
                                     const std::vector<uint8_t>& data,
