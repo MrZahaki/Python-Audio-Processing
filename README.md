@@ -34,6 +34,7 @@ Here's an example to get you started with sudio:
 
 ```python
 import sudio
+from sudio.process.fx import FadeEnvelope, FadePreset
 
 # Initialize Sudio Master
 su = sudio.Master()
@@ -43,7 +44,7 @@ song = su.add('awesome_track.ogg')
 
 # Slice, mix, and transform audio with ease
 remix = song[10: 30]  + song[10.15: 25: .95, :'300'] * -10
-remix.afx(sudio.process.fx.FadeEnvelope, preset=FadePreset.LINEAR_FADE_IN)
+remix.afx(FadeEnvelope, preset=FadePreset.LINEAR_FADE_IN)
 
 # Play and export the transformed audio
 su.echo(remix)
