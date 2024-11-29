@@ -1,4 +1,7 @@
 
+import numpy as np
+cimport numpy as np
+
 
 # SUDIO - Audio Processing Platform
 # Copyright (C) 2024 Hossein Zahaki
@@ -20,25 +23,32 @@
 
 
 
-import os
-import sys
+cpdef enum FadePreset:
+    SMOOTH_ENDS
+    BELL_CURVE
+    KEEP_ATTACK_ONLY
+    LINEAR_FADE_IN
+    LINEAR_FADE_OUT
+    PULSE
+    REMOVE_ATTACK
+    SMOOTH_ATTACK
+    SMOOTH_FADE_IN
+    SMOOTH_FADE_OUT
+    SMOOTH_RELEASE
+    TREMORS
+    ZIGZAG_CUT
 
-def get_encoded_filename_bytes(filepath: str) -> bytes:
-    """
-    Encode the given file path string into bytes using the system's filesystem encoding.
+cpdef np.ndarray[double, ndim=1] generate_envelope(
+    int envlen,
+    FadePreset preset,
+    bint enable_spline,
+    double spline_sigma,
+    double fade_max_db,
+    double fade_min_db,
+    double fade_attack,
+    double fade_release,
+    int buffer_size,
+    double sawtooth_freq
+)
 
-    Parameters:
-    - filepath (str): The input file path.
-
-    Returns:
-    - bytes: The encoded file path as bytes.
-
-    Raises:
-    - FileNotFoundError: If the specified file does not exist.
-    """
-    expanded_filepath = os.path.expanduser(filepath)
-    
-    if not os.path.isfile(expanded_filepath):
-        raise FileNotFoundError(filepath)
-
-    return expanded_filepath.encode(sys.getfilesystemencoding())
+cdef double db2amp(double db) nogil

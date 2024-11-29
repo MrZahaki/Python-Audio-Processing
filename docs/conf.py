@@ -13,7 +13,7 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx_autodoc_typehints',
     'breathe',
-    'exhale',
+    'exhale'
 ]
 
 templates_path = ['_templates']
@@ -36,9 +36,9 @@ exhale_args = {
     "createTreeView":        True,
     "exhaleExecutesDoxygen": True,
     "exhaleDoxygenStdin":    """
-        INPUT                  = ../sudio/io ../sudio/rateshift 
+        INPUT                  = ../sudio/io ../sudio/rateshift
         EXCLUDE_PATTERNS       = */miniaudio/* */dr_libs/* */portaudio/* */libsamplerate/* */*.py */libmp3lame-CMAKE/* */lame/* */flac/* */ogg/* */vorbis/*
-        FILTER_PATTERNS        = *.cpp=doxyfilter.py
+        FILTER_PATTERNS        = *.cpp=python doxyfilter.py
         RECURSIVE              = YES 
         GENERATE_XML           = YES
         GENERATE_HTML          = NO
@@ -50,7 +50,16 @@ breathe_implementation_filename_extensions = ['.c', '.cc', '.cpp', '.hpp']
 primary_domain = 'cpp'
 highlight_language = 'cpp'
 html_show_sourcelink = False
-autodoc_mock_imports = ['sudio.suio', 'sudio.io', 'scipy', 'numpy']
+autodoc_mock_imports = [
+    'sudio.suio', 
+    'sudio.io', 
+    'scipy', 
+    'numpy',
+    'sudio._process_fx_tempo',
+    'sudio._process_fx_fade_envelope',
+    'sudio._rateshift',
+    'sudio.rateshift',
+    ]
 html_context = {
     "google_analytics_id": "G-RLP20V08DB",
 }

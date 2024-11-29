@@ -1,9 +1,23 @@
 
-#  W.T.A
-#  SUDIO (https://github.com/MrZahaki/sudio)
-#  The Audio Processing Platform
-#  Mail: mrzahaki@gmail.com
-#  Software license: "Apache License 2.0". See https://choosealicense.com/licenses/apache-2.0/
+
+# SUDIO - Audio Processing Platform
+# Copyright (C) 2024 Hossein Zahaki
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+# - GitHub: https://github.com/MrZahaki/sudio
+
 
 from sudio.stream.streamingtimecontroller import StreamingTimeController
 
@@ -20,6 +34,7 @@ class StreamControl:
         Initialize the StreamControl class to manage the mainstream audio playback for a specific 'record'.
 
         Args:
+
         - master: An instance of the main audio processing class.
         - record: A dictionary containing information about the audio file to be streamed.
         - on_stop: Callback function to execute when audio playback stops.
@@ -27,6 +42,7 @@ class StreamControl:
         - stream_mode: Type of streaming operation (e.g., 'read', 'write').
 
         Attributes:
+
         - self._master: Reference to the main audio processing instance.
         - self._stream_type: Type of streaming operation.
         - self._stream_file: File object representing the audio file.
@@ -41,17 +57,19 @@ class StreamControl:
         - self._itime_calculator: Lambda function to convert byte offset to time.
 
         Raises:
+
         - PermissionError: If attempting to initialize while another file is streaming.
 
         Note:
+        
         - This class facilitates the management of audio playback for a specific audio file, ensuring proper synchronization
         and handling of playback-related operations.
         '''
 
         self._master = master
         self._stream_type = stream_mode
-        self._stream_file = record['o']
-        self._stream_file_size = record['size']
+        self._stream_file = record.o
+        self._stream_file_size = record.size
         self._size_calculator = lambda: (self._master._data_chunk *
                                          self._master._nchannels *
                                          self._master._sample_width)
@@ -60,7 +78,7 @@ class StreamControl:
         self._stream_on_stop = on_stop
         self._stream_loop_mode = loop_mode
 
-        self.duration = record['duration']
+        self.duration = record.duration
         self._time_calculator = lambda t: int(self._master._sample_rate *
                                               self._master._nchannels *
                                               self._master._sample_width *

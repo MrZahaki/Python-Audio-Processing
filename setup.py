@@ -1,3 +1,23 @@
+
+# SUDIO - Audio Processing Platform
+# Copyright (C) 2024 Hossein Zahaki
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+# - GitHub: https://github.com/MrZahaki/sudio
+
+
 import os
 import subprocess
 import sys
@@ -5,8 +25,9 @@ from pathlib import Path
 
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
+from Cython.Build import cythonize
+import numpy
 
-# CMake platform mapping
 CMAKE_PLATFORMS = {
     "win32": "Win32",
     "win-amd64": "x64",
@@ -19,8 +40,20 @@ class CMakeExtension(Extension):
         super().__init__(name, sources=[])
         self.sourcedir = os.fspath(Path(sourcedir).resolve())
 
-class CMakeBuild(build_ext):
-    def build_extension(self, ext: CMakeExtension) -> None:
+class CythonExtension(Extension):
+    pass
+
+class CustomBuildExt(build_ext):
+    
+    def build_extension(self, ext):
+        if isinstance(ext, CMakeExtension):
+            return self.build_cmake_extension(ext)
+        elif isinstance(ext, CythonExtension) or isinstance(ext, Extension):
+            return super().build_extension(ext)
+        else:
+            raise ValueError(f"Unknown extension type: {type(ext)}")
+    
+    def build_cmake_extension(self, ext):
         ext_fullpath = Path.cwd() / self.get_ext_fullpath(ext.name)
         extdir = ext_fullpath.parent.resolve()
 
@@ -88,19 +121,54 @@ class CMakeBuild(build_ext):
 
     def _run_cmake_build(self, ext, cmake_args, build_args, build_temp):
         subprocess.run(
-            ["cmake", ext.sourcedir, *cmake_args], cwd=build_temp, check=True
+            ["cmake", ext.sourcedir, *cmake_args, "-Wno-dev", "--log-level", "NOTICE" ], cwd=build_temp, check=True
         )
         subprocess.run(
-            ["cmake", "--build", ".", *build_args], cwd=build_temp, check=True
+            ["cmake", "--build", "." , "--parallel", *build_args], cwd=build_temp, check=True
         )
+
+
+cython_extensions = [
+        Extension(
+        "sudio._process_fx_tempo",
+        ["sudio/process/fx/_tempo.pyx"],
+        include_dirs=[numpy.get_include()],
+        extra_compile_args=["-O3"], 
+    ),
+    Extension(
+    "sudio._process_fx_fade_envelope",
+    ["sudio/process/fx/_fade_envelope.pyx"],
+    include_dirs=[numpy.get_include()],
+    extra_compile_args=["-O3"], 
+),
+]
+
+cmake_extensions = [
+    CMakeExtension('sudio._rateshift'), 
+    CMakeExtension('sudio.suio'),
+]
+
+cythonized_extensions = cythonize(
+    cython_extensions,
+    compiler_directives={
+        'language_level': '3',
+        'boundscheck': False,
+        'wraparound': False,
+        'cdivision': True,
+        'nonecheck': False,
+    }
+)
 
 setup(
     packages=find_packages(),
     package_dir={'': '.'},
-    ext_modules=[CMakeExtension('sudio.rateshift'), CMakeExtension('sudio.suio')],
-    cmdclass={'build_ext': CMakeBuild},
+    ext_modules=[
+        *cmake_extensions,  
+        *cythonized_extensions, 
+    ],
+    cmdclass={'build_ext': CustomBuildExt},
     zip_safe=False,
     package_data={
-        "": ["*.pyi"],
+        "": ["*.pxd", "*.pyx"],
     },
 )

@@ -1,5 +1,6 @@
-Sudio Types
-===========
+utils Module
+============
+
 
 .. raw:: html
 
@@ -15,27 +16,38 @@ Sudio Types
 
 
 
-.. automodule:: sudio.types.enum
+.. automodule:: sudio.utils.channel
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: sudio.types.error
+.. automodule:: sudio.utils.io
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: sudio.types.name
+.. automodule:: sudio.utils.math
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: sudio.types.pipelineonbusytype
+.. automodule:: sudio.utils.strtool
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: sudio.types.pipelineprocesstype
+.. automodule:: sudio.utils.timed_indexed_string
    :members:
    :undoc-members:
    :show-inheritance:
+
+.. automodule:: sudio.utils.typeconversion
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: sudio.utils.window
+   :members:
+   :undoc-members:
+   :show-inheritance:
+

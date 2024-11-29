@@ -1,6 +1,6 @@
 <div align="center">
     <picture style="pointer-events: none; user-select: none;">
-        <img src="https://raw.githubusercontent.com/mrzahaki/sudio/Master/docs/sudio.png" alt="sudio" width="60%" height="60%">
+        <img src="https://raw.githubusercontent.com/mrzahaki/sudio/Master/docs/_static/sudio.png" alt="sudio" width="60%" height="60%">
     </picture>
 </div>
 
@@ -15,7 +15,7 @@
 [![Supported OS](https://img.shields.io/badge/OS-Linux%20%7C%20macOS%20%7C%20Windows-blue)](https://shields.io/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-Sudio is an open-source digital audio processing library that offers advanced functionality through an intuitive interface. It supports both real-time and non-real-time audio manipulation, making it versatile for a wide range of audio applications, from simple playback to complex audio transformations.
+Sudio is a Python audio processing library that provides developers and audio enthusiasts with a comprehensive toolkit for advanced sound manipulation. It offers intuitive, high-performance methods for time-domain audio editing, spectral filtering, dynamic effect application, and audio streaming, enabling complex audio transformations with minimal code complexity.
 
 
 ## 🚀 Quick Start
@@ -30,17 +30,27 @@ pip install sudio --upgrade
 
 ### Basic Usage
 
-Here's a simple example to get you started with audio playback:
+Here's an example to get you started with sudio:
 
 ```python
 import sudio
 
+# Initialize Sudio Master
 su = sudio.Master()
-song = su.add('example.mp3')
-su.echo(song[0:15, :'1000'])
+
+# Load an audio file
+song = su.add('awesome_track.ogg')
+
+# Slice, mix, and transform audio with ease
+remix = song[10: 30]  + song[10.15: 25: .95, :'300'] * -10
+remix.afx(sudio.process.fx.FadeEnvelope, preset=FadePreset.LINEAR_FADE_IN)
+
+# Play and export the transformed audio
+su.echo(remix)
+su.export(remix, 'cool_remix.mp3')
 ```
 
-This will play the first 15 seconds of the audio file ‘example.mp3’, filtering out frequencies below 1000 Hz, on the standard output audio stream.
+ the original 20-second segment (10-30 seconds) is layered with a slightly time-shifted slice, filtered to low frequencies below 300 Hz, with .95 original speed, and dramatically attenuated by -10 dB to create a subtle, atmospheric undertone. The LINEAR_FADE_IN envelope effect adds a gradual volume increase, creating a smooth, building intensity to the remix. 
 
 ## 🎹 Key Features
 - Handles both real-time streaming and offline processing, allowing for dynamic applications like live audio effects as well as batch processing of audio files.
@@ -62,10 +72,10 @@ Sudio is like a symphony in progress, and we'd love for you to join the orchestr
 
 ## 💖 Support Sudio
 
-If Sudio has been helpful to you, consider supporting its development:
+I don't need your support. The link below is fake! Don't click on it, and don't pay anything. I mean it, just ignore it!
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/mrzahaki)
 
 ## 📄 License
 
-Sudio is released under the Apache License 2.0. See the [LICENSE](https://github.com/mrzahaki/sudio/blob/Master/LICENSE) file for details.
+Sudio is released under the GNU AFFERO GENERAL PUBLIC LICENSE Version 3. See the [LICENSE](https://github.com/mrzahaki/sudio/blob/Master/LICENSE) file for details.

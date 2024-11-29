@@ -2,11 +2,7 @@ class RefreshError(Exception):
     """Exception raised when a refresh operation encounters an error."""
 
 
-class MiniaudioError(Exception):
-    """Base exception class for errors related to miniaudio."""
-
-
-class DecodeError(MiniaudioError):
+class DecodeError(Exception):
     """Exception raised when an error occurs during audio decoding."""
 
 

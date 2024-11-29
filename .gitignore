@@ -38,6 +38,8 @@ sudio/io/lame/
 sudio/io/flac/
 sudio/io/ogg/
 sudio/io/vorbis/
+sudio/process/fx/*.c
+sudio/process/fx/*.cpp
 docs/_build
 docs/doxyoutput
 docs/api

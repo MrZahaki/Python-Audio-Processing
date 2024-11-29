@@ -1,12 +1,25 @@
-#  W.T.A
-#  SUDIO (https://github.com/MrZahaki/sudio)
-#  The Audio Processing Platform
-#  Mail: mrzahaki@gmail.com
-#  Software license: "Apache License 2.0". See https://choosealicense.com/licenses/apache-2.0/
+
+# SUDIO - Audio Processing Platform
+# Copyright (C) 2024 Hossein Zahaki
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+# - GitHub: https://github.com/MrZahaki/sudio
+
 
 
 import numpy as np
-from sudio.utils.arraytool import push
 
 
 def win_parser_mono(window, win_num):
@@ -26,7 +39,8 @@ def single_channel_windowing(
 
     retval = np.vstack((windowing_buffer[1], np.hstack((windowing_buffer[1][nhop:],
                                                         windowing_buffer[0][:nhop])))) * window
-    push(windowing_buffer, data)
+    windowing_buffer.pop()
+    windowing_buffer.insert(0, data)
 
     return retval
 
@@ -43,7 +57,8 @@ def multi_channel_windowing(
     for i in range(nchannels):
         retval.append(np.vstack((windowing_buffer[i][1], np.hstack(
             (windowing_buffer[i][1][nhop:], windowing_buffer[i][0][:nhop])))) * window)
-        push(windowing_buffer[i], data[i])
+        windowing_buffer[i].pop()
+        windowing_buffer[i].insert(0, data[i])
     return np.array(retval)
 
 

@@ -1,12 +1,27 @@
 
-#  W.T.A
-#  SUDIO (https://github.com/MrZahaki/sudio)
-#  The Audio Processing Platform
-#  Mail: mrzahaki@gmail.com
-#  Software license: "Apache License 2.0". See https://choosealicense.com/licenses/apache-2.0/
+
+# SUDIO - Audio Processing Platform
+# Copyright (C) 2024 Hossein Zahaki
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+# - GitHub: https://github.com/MrZahaki/sudio
+
 
 
 import numpy as np
+from typing import Union
 
 def find_nearest_divisible(reference_number, divisor):
     """
@@ -76,45 +91,8 @@ def find_nearest_divisor(num, divisor):
         
     raise ValueError("No divisor with a zero remainder found.")
 
+def db2amp(db:Union[float, int]):
+    return np.power(10.0, (db / 20.0))
 
-
-def voltage_to_dBu(v):
-    """
-    Converts a voltage 'v' to decibels relative to 1 microvolt (uV).
-
-    Args:
-        v (float): The input voltage.
-
-    Returns:
-        float: The corresponding value in decibels (dBu).
-
-    Example:
-        >>> voltage_to_dBu(1e-6)
-        0.0
-        >>> voltage_to_dBu(1e-5)
-        20.0
-        >>> voltage_to_dBu(1e-4)
-        40.0
-    """
-    return 20 * np.log10(v / np.sqrt(0.6))
-
-def dBu_to_voltage(dbu):
-    """
-    Converts a value in decibels relative to 1 microvolt (dBu) to its corresponding voltage.
-
-    Args:
-        dbu (float): The input value in decibels.
-
-    Returns:
-        float: The corresponding voltage.
-
-    Example:
-        >>> dBu_to_voltage(0.0)
-        1e-06
-        >>> dBu_to_voltage(20.0)
-        1e-05
-        >>> dBu_to_voltage(40.0)
-        0.0001
-    """
-    return np.sqrt(0.6) * 10 ** (dbu / 20)
-
+def amp2db(amp: Union[float, int]): 
+    return 20.0 * np.log10(amp)

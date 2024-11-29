@@ -3,7 +3,9 @@ Welcome to the Sudio 🎵
 =======================
 
 
-``sudio`` is an **Open-source**, **easy-to-use** digital audio processing library featuring both a **real-time**, **non-real-time** mix/edit platform.
+`Sudio` is a Python audio manipulation library that provides comprehensive tools for audio processing, including time-domain slicing, speed manipulation, mixing tracks, 
+applying audio effects (like gain adjustment and filtering), audio analysis, format conversion, and streaming with precise playback control. 
+The library offers an intuitive, Pythonic approach to working with audio files, allowing users to easily perform complex audio operations with just a few lines of code.
 
 
 .. raw:: html
@@ -11,7 +13,7 @@ Welcome to the Sudio 🎵
    <br>
 
 
-.. image:: https://raw.githubusercontent.com/mrzahaki/sudio/Master/docs/sudio.png
+.. image:: https://raw.githubusercontent.com/mrzahaki/sudio/Master/docs/_static/sudio.png
    :alt: sudio
    :width: 60%
    :align: center
@@ -21,8 +23,12 @@ Welcome to the Sudio 🎵
 .. raw:: html
 
    <br>
-   <div align="center"> 🎵 <b>Sudio</b> is like a <b>budding musician</b> finding its rhythm. Your support can help it <b>compose a symphony</b>. 🎶</div>
+   <div align="center">
+   I always finish my projec
+   </div>
+   <div align="center"> If 🎵 <b>Sudio</b> 🎶 has been helpful to you, consider supporting its development.</div>
    <br>
+
 
 
 .. raw:: html
@@ -55,7 +61,9 @@ Welcome to the Sudio 🎵
 LICENCE
 -------
 
-Open Source (OSI approved): Apache License 2.0
+Sudio is released under the GNU AFFERO GENERAL PUBLIC LICENSE Version 3. See the `LICENSE <https://github.com/mrzahaki/sudio/blob/Master/LICENSE>`_ file for details.
+
+
 
 
 
@@ -73,8 +81,9 @@ Open Source (OSI approved): Apache License 2.0
    metadata
    stream
    types
+   utils
    rateshift
-   wrap
+   process
    Source code <https://github.com/mrzahaki/sudio>
 
 

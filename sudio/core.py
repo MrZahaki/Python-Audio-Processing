@@ -1,14 +1,28 @@
-#  W.T.A
-#  SUDIO (https://github.com/MrZahaki/sudio)
-#  The Audio Processing Platform
-#  Mail: mrzahaki@gmail.com
-#  Software license: "Apache License 2.0". See https://choosealicense.com/licenses/apache-2.0/
+
+# SUDIO - Audio Processing Platform
+# Copyright (C) 2024 Hossein Zahaki
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+# - GitHub: https://github.com/MrZahaki/sudio
+
 
 import scipy.signal as scisig
 import threading
 import queue
 import numpy as np
-from typing import Union, Callable, Generator
+from typing import Union, Callable
 import warnings
 import gc
 import time
@@ -20,18 +34,16 @@ from pathlib import Path
 
 from sudio.types import StreamMode, RefreshError
 from sudio.types import PipelineProcessType
-from sudio.wrap.generator import Generator
-from sudio.wrap.wrap import Wrap
-from sudio.utils.exmath import voltage_to_dBu
+from sudio.process.audio_wrap import AudioWrap
 from sudio.utils.strtool import generate_timestamp_name 
 from sudio.utils.timed_indexed_string import TimedIndexedString 
 from sudio.stream.stream import Stream
 from sudio.stream.streamcontrol import StreamControl
-from sudio.audiosys.window import multi_channel_overlap, single_channel_overlap
-from sudio.audiosys.window import multi_channel_windowing, single_channel_windowing
-from sudio.audiosys.channel import shuffle3d_channels, shuffle2d_channels, get_mute_mode_data, map_channels
+from sudio.utils.window import multi_channel_overlap, single_channel_overlap
+from sudio.utils.window import multi_channel_windowing, single_channel_windowing
+from sudio.utils.channel import shuffle3d_channels, shuffle2d_channels, get_mute_mode_data, map_channels
 from sudio.audiosys.sync import synchronize_audio
-from sudio.utils.cacheutil import handle_cached_record, write_to_cached_file
+from sudio.audiosys.cacheman import handle_cached_record, write_to_cached_file
 from sudio.pipeline import Pipeline
 from sudio.metadata import AudioRecordDatabase, AudioMetadata
 from sudio.io import SampleFormat, codec, write_to_default_output, AudioStream
@@ -42,7 +54,7 @@ from sudio.io._webio import WebAudioIO
 
 class Master:
 
-    CACHE_INFO = 4 * 8
+    CACHE_INFO_SIZE = 4 * 8
     BUFFER_TYPE = '.su'
 
     def __init__(self,
@@ -85,11 +97,13 @@ class Master:
 		  Number of overlapping segments. If None, defaults to nperseg // 2.
 		- **window** : str, float, tuple, or ndarray, optional
 		  Window type or array. Default is 'hann'.
+
 		  - If string: Specifies a scipy.signal window type (e.g., 'hamming', 'blackman').
 		  - If float: Interpreted as the beta parameter for scipy.signal.windows.kaiser.
 		  - If tuple: First element is the window name, followed by its parameters.
 		  - If ndarray: Direct specification of window values.
 		  - If None: Disables windowing.
+
 		- **NOLA_check** : bool, optional
 		  Perform the Non-Overlap-Add (NOLA) check. Default is True.
 		- **input_dev_sample_rate** : int, optional
@@ -111,6 +125,7 @@ class Master:
 
         Notes
         -----
+        
         - Various methods are available for audio processing, pipeline management, and device control.
           Refer to individual method docstrings for details.
         - The class uses threading for efficient audio stream management.
@@ -133,7 +148,6 @@ class Master:
             '<f{}'.format(self._sample_width) if data_format == SampleFormat.FLOAT32.value else '<i{}'.format(self._sample_width)
         )
 
-        # Initialize threading events and flags
         self._exstream_mode = threading.Event()
         self._master_mute_mode = threading.Event()
         self._stream_loop_mode = False
@@ -296,7 +310,6 @@ class Master:
         self._output_channels = output_channels
         self._nchannels = self._output_channels
 
-        # Raise an error if no input or output device is found
         if self._nchannels == 0:
             raise ValueError('No input or output device found')
         self.mute()
@@ -351,6 +364,7 @@ class Master:
 
         Returns
         -------
+
         self : Master
             Returns the instance of the Master class for method chaining.
         """
@@ -396,11 +410,23 @@ class Master:
             raise
 
     def _run(self, th_id):
+        """
+        Grabs a function from the queue and runs it with the given thread ID, 
+        then marks the task as complete. Essentially a simple worker method 
+        to keep things moving smoothly.
+        """
         self._functions[self._queue.get()](th_id)
         self._queue.task_done()
 
 
     def _exstream(self):
+        """
+        Handles external stream file reading and processing.
+
+        Reads audio data chunk by chunk from a file, manages looping or 
+        stopping behavior, and puts the data into the main stream. Handles 
+        edge cases like reaching end of file or needing to loop back.
+        """
         while self._exstream_mode.is_set():
             in_data: np.ndarray = np.frombuffer(
                 self._stream_file.read(self._stream_data_size),
@@ -435,12 +461,26 @@ class Master:
                 break
     
     def _main_stream_safe_release(self):
+        """
+        Safely releases the main stream lock if it's currently locked.
+
+        Prevents potential deadlocks by checking and releasing the stream 
+        lock only if it's actually held. A little insurance policy for 
+        thread safety.
+        """
         if self._main_stream.locked():
             self._main_stream.release()
 
 
     def _input_stream_callback(self, in_data, frame_count, format):  
-        
+        """
+        Processes incoming audio input stream data.
+
+        Handles different modes like external streaming, mute, and normal 
+        input. Manages channel mapping, puts data into the main stream, and 
+        handles potential errors gracefully. The Swiss Army knife of 
+        audio input processing.
+        """
 
         if self._exstream_mode.is_set():
             self._exstream()
@@ -564,32 +604,39 @@ class Master:
 
                 self._main_stream.clear()
 
-    # RMS to dbu
-    # signal maps to standard +4 dbu
-    def _rdbu(self, arr):
-        return voltage_to_dBu(np.max(arr) / ((2 ** (self._sample_width * 8 - 1) - 1) / 1.225))
-
 
     def add_file(self, filename: str, sample_format: SampleFormat = SampleFormat.UNKNOWN,
                 nchannels: int = None, sample_rate: int = None ,safe_load=True):
         '''
-        Add an audio file to database. None value for the parameters means
-        that they are automatically selected based on the properties of the audio file, and the master object.
+        Adds an audio file to the database with optional format and parameter adjustments.
 
-        Note:
-         supported files format: WAV, FLAC, VORBIS, MP3
+        Supports WAV, FLAC, VORBIS, and MP3 file formats.
 
-        Note:
-         The audio data maintaining process has additional cached files to reduce dynamic memory usage and improve performance,
-         meaning that, The audio data storage methods can have different execution times based on the cached files.
+        Parameters:
+        -----------
 
-        :param filename: path/name of the audio file
-        :param sample_format: sample format
-        :param nchannels: number of audio channels
-        :param sample_rate: sample rate
-        :param safe_load: load an audio file and modify it according to the 'Master' attributes.
-         (sample rate, sample format, number of channels, etc).
-        :return: Generator object
+        filename : str
+            Path/name of the audio file to add.
+        sample_format : SampleFormat, optional
+            Desired sample format. Defaults to automatically detecting or using master's format.
+        nchannels : int, optional
+            Number of audio channels. Defaults to file's original channel count.
+        sample_rate : int, optional
+            Desired sample rate. Defaults to file's original rate.
+        safe_load : bool, default True
+            If True, modifies file to match master object's audio attributes.
+
+        Returns:
+        --------
+
+        AudioWrap
+            Wrapped audio file with processed metadata and data.
+
+        Raises:
+        -------
+
+        ImportError
+            If safe_load is True and file's channel count exceeds master's channels.
 
         '''
         info = codec.get_file_info(filename)
@@ -610,19 +657,6 @@ class Master:
         elif sample_rate is None:
             sample_rate = info.sample_rate
 
-
-        record ={
-            'size': None,
-            'noise': None,
-            'frameRate': sample_rate,
-            'o': None,
-            'sampleFormat': sample_format,
-            'nchannels': nchannels,
-            'duration': info.duration,
-            'nperseg': self._nperseg,
-        }
-
-
         p0 = max(filename.rfind('\\'), filename.rfind('/')) + 1
         p1 = filename.rfind('.')
         if p0 < 0:
@@ -633,85 +667,109 @@ class Master:
         if name in self._local_database.index():
             name = name + generate_timestamp_name()
 
-
-        if safe_load and  record['nchannels'] > self._nchannels:
-            raise ImportError('number of channel for the {name}({ch0})'
-                              ' is not same as object channels({ch1})'.format(name=name,
-                                                                              ch0=record['nchannels'],
-                                                                              ch1=self._nchannels))
-        decoder = lambda: codec.decode_audio_file(filename, sample_format, nchannels, sample_rate)
-
-        record = (
-        handle_cached_record(record,
-                    TimedIndexedString(self._audio_data_directory + name + Master.BUFFER_TYPE,
-                                      start_before=Master.BUFFER_TYPE),
-                    self,
-                    safe_load = safe_load,
-                    decoder=decoder)
+        record = AudioMetadata(name, **{
+                'size': None,
+                'noise': None,
+                'frameRate': sample_rate,
+                'o': None,
+                'sampleFormat': sample_format,
+                'nchannels': nchannels,
+                'duration': info.duration,
+                'nperseg': self._nperseg,
+            }
         )
 
-        metadata = AudioMetadata(name, **record)
-        self._local_database.add_record(metadata)
+        if safe_load and  record.nchannels > self._nchannels:
+            raise ImportError('number of channel for the {name}({ch0})'
+                              ' is not same as object channels({ch1})'.format(name=name,
+                                                                              ch0=record.nchannels,
+                                                                              ch1=self._nchannels))
+        decoder = lambda: codec.decode_audio_file(filename, sample_format, nchannels, sample_rate)
+        path_server = TimedIndexedString(
+                self._audio_data_directory + name + Master.BUFFER_TYPE,
+                start_before=Master.BUFFER_TYPE
+                )
+        cache_info = self._cache()
+
+        record = handle_cached_record(
+            record=record,
+            path_server=path_server,
+            cache_info=cache_info,
+            cache_info_size=self.__class__.CACHE_INFO_SIZE,
+            decoder=decoder,
+            sync_sample_format_id=self._sample_format,
+            sync_nchannels=self._nchannels,
+            sync_sample_rate=self._sample_rate,
+            safe_load = safe_load,
+            )
+        self._local_database.add_record(record)
         gc.collect()
         return self.load(name)
 
 
     def add(self, record, safe_load=True):
         """
-        Adds audio metadata or data to the local database. This method can handle various types of input including wrapped records, 
-        metadata objects, or audio files in mp3, WAV, FLAC, or VORBIS format.
+        Adds audio data to the local database from various input types.
+
+        Supports adding:
+        - AudioWrap objects
+        - Audio file paths (mp3, WAV, FLAC, VORBIS)
+        - AudioMetadata records
 
         Parameters:
         -----------
-        record : 
-            The record to be added. Can be:
-            - A Wrap or Generator object
-            - A string representing the path to an audio file
-            - AudioMetadata containing record data
 
-        safe_load : bool, optional
-            If True (default), the audio file is loaded and modified according to
-            the Master object's attributes. This ensures compatibility with the
-            current audio processing settings.
+        record : Union[AudioWrap, str, AudioMetadata]
+            The audio record to add to the database.
+        safe_load : bool, default True
+            If True, ensures record matches master object's audio specifications.
 
         Returns:
         --------
-        Generator
-            A wrapped version of the added record.
+
+        AudioWrap
+            Processed and wrapped audio record.
+
+        Raises:
+        -------
+
+        ImportError
+            If safe_load is True and record's channel count exceeds master's.
+        TypeError
+            If record is not a supported type.
 
         Notes:
         ------
-        - The method uses cached files to optimize memory usage and improve performance. 
-         As a result, execution times may vary depending on the state of these cached files.
-        - Supported audio file formats: mp3, WAV, FLAC, VORBIS
 
+        - Uses cached files for optimized memory management
+        - Execution time may vary based on cached file state
 
         Examples:
         ---------
 
         .. code-block:: python
             
-            # consider we have two master instances as m1, and m2
-            # Adding an audio file
-            record1 = m1.add("path/to/audio.wav")
+            master = sudio.Master()
+            audio = master.add('./alan kujay.mp3')
 
-            # adding a copy of record1 into master 2 instance
-            record2 = m2.add(record1)
+            master1 = sudio.Master()
+            audio1 = master1.add(audio)
+
+            master.echo(audio[:10])
+            master1.echo(audio1[:10])
         """
-        name_type = type(record)
-
-        if name_type is Wrap or name_type is Generator:
+        if isinstance(record, AudioWrap):
             record = record.get_data()
             return self.add(record, safe_load=safe_load)
 
-        elif name_type is AudioMetadata:
+        elif isinstance(record, AudioMetadata):
             name = record.name
-            if safe_load and record['nchannels'] > self._nchannels:
+            if safe_load and record.nchannels > self._nchannels:
                 raise ImportError('number of channel for the {name}({ch0})'
                                 ' is not same as object channels({ch1})'.format(name=name,
-                                                                                ch0=record['nchannels'],
+                                                                                ch0=record.nchannels,
                                                                                 ch1=self._nchannels))
-            if type(record['o']) is not BufferedRandom:
+            if type(record.o) is not BufferedRandom:
                 if record.name in self._local_database.index():
                     record.name = generate_timestamp_name()
 
@@ -719,33 +777,33 @@ class Master:
                     record = self._sync_record(record)
 
                 f, newsize = (
-                    write_to_cached_file(record['size'],
-                                record['frameRate'],
-                                record['sampleFormat'] if record['sampleFormat'] else 0,
-                                record['nchannels'],
+                    write_to_cached_file(record.size,
+                                record.frameRate,
+                                record.sampleFormat if record.sampleFormat else 0,
+                                record.nchannels,
                                 file_name=self._audio_data_directory + record.name + Master.BUFFER_TYPE,
-                                data=record['o'],
+                                data=record.o,
                                 pre_truncate=True,
-                                after_seek=(Master.CACHE_INFO, 0),
+                                after_seek=(Master.CACHE_INFO_SIZE, 0),
                                 after_flush=True,
                                 size_on_output=True)
                 )
-                record['o'] = f
-                record['size'] = newsize
+                record.o = f
+                record.size = newsize
 
             elif (not (self._audio_data_directory + record.name + Master.BUFFER_TYPE) == record.name) or \
                     record.name in self._local_database.index():
                 if record.name in self._local_database.index():
                     record.name = generate_timestamp_name()
                 
-                prefile = record['o']
+                prefile = record.o
                 prepos = prefile.tell(), 0
 
-                record['o'], newsize = (
-                    write_to_cached_file(record['size'],
-                                record['frameRate'],
-                                record['sampleFormat'] if record['sampleFormat'] else 0,
-                                record['nchannels'],
+                record.o, newsize = (
+                    write_to_cached_file(record.size,
+                                record.frameRate,
+                                record.sampleFormat if record.sampleFormat else 0,
+                                record.nchannels,
                                 file_name=self._audio_data_directory + record.name + Master.BUFFER_TYPE,
                                 data=prefile.read(),
                                 after_seek=prepos,
@@ -753,18 +811,18 @@ class Master:
                                 size_on_output=True)
                 )
                 prefile.seek(*prepos)
-                record['size'] = newsize
+                record.size = newsize
             self._local_database.add_record(record)
 
             gc.collect()
             return self.wrap(record)
 
-        elif name_type is str:
+        elif isinstance(record, str):
             gc.collect()
             return self.add_file(record, safe_load=safe_load)
 
         else:
-            raise TypeError('The record must be an audio file, data frame or a Wrap object')
+            raise TypeError('The record must be an audio file, data frame or a AudioWrap object')
 
 
     def recorder(self, record_duration: float, name: str = None):
@@ -775,17 +833,19 @@ class Master:
 
         Parameters:
         -----------
+
         record_duration : float
             The duration of the recording in seconds.
 
         name : str, optional
             A custom name for the recorded audio. If None, a timestamp-based name is generated.
 
-        :return: Generator instance
+        :return: AudioWrap instance
 
 
         Notes:
         ------
+
         - The recording uses the current audio input settings of the Master object
          (sample rate, number of channels, etc.).
         - The recorded audio is automatically added to the Master's database and can be
@@ -795,6 +855,7 @@ class Master:
 
         Examples:
         ---------
+
         **Record for 5 seconds with an auto-generated name**
 
          >>> recorded_audio = master.recorder(5)
@@ -827,44 +888,41 @@ class Master:
 
         rec_ev.clear()  # Stop recording
 
-        # Process the recorded data
         sample = np.array(recorded_data)
-        
-        # Apply shuffle3d_channels if not in mono mode
         sample = shuffle3d_channels(sample)
 
-        # Prepare the record data
-        record_data = {
-            'size': sample.nbytes,
-            'noise': None,
-            'frameRate': self._sample_rate,
-            'nchannels': self._nchannels,
-            'sampleFormat': self._sample_format,
-            'nperseg': self._nperseg,
-            'duration': record_duration,
-        }
+        metadata = AudioMetadata(
+            name, 
+            **{
+                'size': sample.nbytes,
+                'noise': None,
+                'frameRate': self._sample_rate,
+                'nchannels': self._nchannels,
+                'sampleFormat': self._sample_format,
+                'nperseg': self._nperseg,
+                'duration': record_duration,
+            }
+        )
 
-        record_data['o'] = write_to_cached_file(
-            record_data['size'],
-            record_data['frameRate'],
-            record_data['sampleFormat'],
-            record_data['nchannels'],
+        metadata.o = write_to_cached_file(
+            metadata.size,
+            metadata.frameRate,
+            metadata.sampleFormat,
+            metadata.nchannels,
             file_name=f"{self._audio_data_directory}{name}{Master.BUFFER_TYPE}",
             data=sample.tobytes(),
             pre_truncate=True,
-            after_seek=(Master.CACHE_INFO, 0),
+            after_seek=(Master.CACHE_INFO_SIZE, 0),
             after_flush=True
         )
 
-        record_data['size'] += Master.CACHE_INFO
-        metadata = AudioMetadata(name, **record_data)
+        metadata.size += Master.CACHE_INFO_SIZE
         self._local_database.add_record(metadata)
-
         return self.wrap(metadata.copy())
 
 
     def load(self, name: str, safe_load: bool=True,
-         series: bool=False) -> Union[Generator, AudioMetadata]:
+         series: bool=False) -> Union[AudioWrap, AudioMetadata]:
         '''
         Loads a record from the local database. Trying to load a record that was previously loaded, 
         outputs a wrapped version of the named record.
@@ -873,7 +931,7 @@ class Master:
         :param safe_load: Flag to safely load the record. if safe load is enabled then load function tries to load a record
          in the local database based on the master settings, like the frame rate and etc (default: `True`).
         :param series:  Return the record as a series (default: `False`).
-        :return: (optional) Generator object, AudioMetadata
+        :return: (optional) AudioWrap object, AudioMetadata
         
         '''
 
@@ -898,7 +956,7 @@ class Master:
         if file_size > rec['size']:
             file.seek(rec['size'], 0)
         else:
-            file.seek(Master.CACHE_INFO, 0)
+            file.seek(Master.CACHE_INFO_SIZE, 0)
 
         self._local_database.add_record(rec)
         if series:
@@ -906,20 +964,21 @@ class Master:
         return self.wrap(rec)
     
 
-    def get_record_info(self, record: Union[str, Generator, Wrap]) -> dict:
+    def get_record_info(self, record: Union[str, AudioWrap]) -> dict:
         '''
         Retrieves metadata for a given record.
 
-        :param record: The record (str, Generator, or Wrap) whose info is requested.
+        :param record: The record (str, or AudioWrap) whose info is requested.
+
         :return: information about saved record in a dict format ['frameRate'  'sizeInByte' 'duration'
             'nchannels' 'nperseg' 'name'].
         '''
-        if type(record) is Generator or Wrap:
+        if isinstance(record, AudioWrap):
             name = record.name
-        elif type(record) is str:
+        elif isinstance(record, str):
             name = record
         else:
-            raise TypeError('record must be an instance of Generator, Wrap or str')
+            raise TypeError('record must be an instance of AudioWrap or str')
         
         if name in self._local_database.index():
             rec = self._local_database.get_record(name)
@@ -948,6 +1007,8 @@ class Master:
         :param nchannels: number of channels; if the value is None, the target will be compared to the 'self' properties.
         :param sample_rate: sample rate; if the value is None, the target will be compared to the 'self' properties.
         :param sample_format_id: if the value is None, the target will be compared to the 'self' properties.
+
+
         :return: only objects that need to be synchronized.
         '''
         nchannels = nchannels if nchannels else self._nchannels
@@ -956,7 +1017,7 @@ class Master:
 
         buffer = []
         for rec in target:
-            assert type(rec) is Wrap or type(rec) is Generator
+            assert isinstance(rec, AudioWrap)
             tmp = rec.get_data()
 
             if (not tmp['nchannels'] == nchannels or
@@ -995,7 +1056,7 @@ class Master:
             sample_format: SampleFormat=SampleFormat.UNKNOWN,
             output='wrapped'):
         '''
-        Synchronizes audio across multiple records. Synchronizes targets in the Wrap object format with the specified properties.
+        Synchronizes audio across multiple records. Synchronizes targets in the AudioWrap object format with the specified properties.
 
         :param targets: Records to sync. wrapped objects.
         :param nchannels: Number of channels (default: `None`); if the value is None, the target will be synced to the 'self' properties.
@@ -1015,9 +1076,9 @@ class Master:
         for record in targets:
             record: AudioMetadata = record.get_data().copy()
             assert isinstance(record, AudioMetadata)
-            main_file: BufferedRandom = record['o']
+            main_file: BufferedRandom = record.o
             main_seek = main_file.tell(), 0
-            record['o'] = main_file.read()
+            record.o = main_file.read()
             main_file.seek(*main_seek)
             synchronize_audio(record, nchannels, sample_rate, sample_format, output_data=out_type)
             record.name = generate_timestamp_name(record.name)
@@ -1031,16 +1092,16 @@ class Master:
     def _sync_record(self, rec):
         return synchronize_audio(rec, self._nchannels, self._sample_rate, self._sample_format)
 
-    def del_record(self, record: Union[str, AudioMetadata, Wrap, Generator]):
+    def del_record(self, record: Union[str, AudioMetadata, AudioWrap]):
         '''
         Deletes a record from the local database.
 
-        :param record: Record to delete (str, AudioMetadata, Wrap, or Generator).
+        :param record: Record to delete (str, AudioMetadata, or AudioWrap).
         '''
 
-        if type(record) is AudioMetadata or type(record) is Wrap or type(record) is Generator:
+        if isinstance(record, (AudioMetadata, AudioWrap)):
             name = record.name
-        elif type(record) is str:
+        elif isinstance(record, str):
             name = record
         else:
             raise TypeError('please control the type of record')
@@ -1070,7 +1131,7 @@ class Master:
 
         gc.collect()
 
-    def export(self, record: Union[str, AudioMetadata, Wrap, Generator], file_path: str = './', format: FileFormat = FileFormat.UNKNOWN, quality: float = 0.5, bitrate: int = 128):
+    def export(self, record: Union[str, AudioMetadata, AudioWrap], file_path: str = './', format: FileFormat = FileFormat.UNKNOWN, quality: float = 0.5, bitrate: int = 128):
         '''
         Exports a record to a file in WAV, MP3, FLAC, or VORBIS format. The output format can be specified either through the `format` 
         argument or derived from the file extension in the `file_path`. If a file extension ('.wav', '.mp3', '.flac', or '.ogg') is 
@@ -1078,10 +1139,10 @@ class Master:
         `format` argument is used, defaulting to WAV if set to FileFormat.UNKNOWN. The exported file is saved at the 
         specified `file_path`.
 
-        :param record: Record to export (str, AudioMetadata, Wrap, or Generator).
+        :param record: Record to export (str, AudioMetadata, or AudioWrap).
                     - str: Path to a file to be loaded and exported.
                     - AudioMetadata: A metadata object containing audio data.
-                    - Wrap / Generator: Objects that wrap or generate the audio data.
+                    - AudioWrap: Objects that wrap or generate the audio data.
         :param file_path: Path to save the exported file (default: './').
                         - A new filename can be specified at the end of the path.
                         - If a valid file extension ('.wav', '.mp3', '.flac', or '.ogg') is provided, it determines the output format, overriding the `format` argument.
@@ -1097,17 +1158,17 @@ class Master:
         :return: None
 
         Raises:
-        - TypeError: Raised if `record` is not one of the expected types (str, AudioMetadata, Wrap, or Generator).
+
+        - TypeError: Raised if `record` is not one of the expected types (str, AudioMetadata, or AudioWrap).
         - ValueError: Raised if an unsupported format is provided.
         '''
 
         file_path = file_path.strip()
-        rec_type = type(record)
-        if rec_type is str:
+        if isinstance(record, str): 
             record = self.load(record, series=True)
-        elif rec_type is Wrap or rec_type is Generator:
+        elif isinstance(record, AudioWrap):
             record = record.get_data()
-        elif rec_type is AudioMetadata:
+        elif isinstance(record, AudioMetadata):
             pass
         else:
             raise TypeError('please control the type of record')
@@ -1143,7 +1204,7 @@ class Master:
         else:
             file_path = name
         
-        file = record['o']
+        file = record.o
         file_pos = file.tell()
         data = file.read()
         file.seek(file_pos, 0)
@@ -1152,18 +1213,18 @@ class Master:
             codec.encode_wav_file(
                 file_path,
                 data,
-                record['sampleFormat'],
-                record['nchannels'],
-                record['frameRate'],
+                record.sampleFormat,
+                record.nchannels,
+                record.frameRate,
             )
         elif format == FileFormat.MP3:
             mp3_quality = int(quality * 9)  # Convert 0-1 to 0-9 scale
             codec.encode_mp3_file(
                 file_path,
                 data,
-                record['sampleFormat'],
-                record['nchannels'],
-                record['frameRate'],
+                record.sampleFormat,
+                record.nchannels,
+                record.frameRate,
                 bitrate,
                 mp3_quality
             )
@@ -1172,18 +1233,18 @@ class Master:
             codec.encode_flac_file(
                 file_path,
                 data,
-                record['sampleFormat'],
-                record['nchannels'],
-                record['frameRate'],
+                record.sampleFormat,
+                record.nchannels,
+                record.frameRate,
                 flac_compression
             )
         elif format == FileFormat.VORBIS:
             codec.encode_vorbis_file(
                 file_path,
                 data,
-                record['sampleFormat'],
-                record['nchannels'],
-                record['frameRate'],
+                record.sampleFormat,
+                record.nchannels,
+                record.frameRate,
                 quality
             )
 
@@ -1214,7 +1275,7 @@ class Master:
         '''
         return self._sample_rate
 
-    def stream(self, record: Union[str, Wrap, AudioMetadata, Generator],
+    def stream(self, record: Union[str, AudioMetadata, AudioWrap],
                block_mode: bool=False,
                safe_load: bool=False,
                on_stop: callable=None,
@@ -1225,13 +1286,15 @@ class Master:
         Streams a record with optional loop and safe load modes.
 
         Note:
-         The audio data maintaining process has additional cached files to reduce dynamic memory usage and improve performance,
-         meaning that, The audio data storage methods can have different execution times based on the cached files.
+        
+            The audio data maintaining process has additional cached files to reduce dynamic memory usage and improve performance,
+            meaning that, The audio data storage methods can have different execution times based on the cached files.
 
         Note:
-        The recorder can only capture normal streams(Non-optimized streams)
 
-        :param record: Record to stream (str, Wrap, AudioMetadata, or Generator).
+            The recorder can only capture normal streams(Non-optimized streams)
+
+        :param record: Record to stream (str, AudioMetadata, or AudioWrap).
         :param block_mode: Whether to block the stream (default: `False`).
         :param safe_load: Whether to safely load the record (default: `False`). 
          load an audio file and modify it according to the 'Master' attributes(like the frame rate, number oof channels, etc).
@@ -1239,6 +1302,7 @@ class Master:
         :param loop_mode: Whether to enable loop mode (default: `False`).
         :param use_cached_files: Whether to use cached files (default: `True`).
         :param stream_mode: Streaming mode (default: `StreamMode.optimized`).
+
         :return: A StreamControl object
         '''
 
@@ -1247,31 +1311,30 @@ class Master:
         # loop mode dont workes in blocking mode
         cache_head_check_size = 20
 
-        rec_type = type(record)
-        if rec_type is str:
+        if isinstance(record, str):
             record = self.load(record, series=True)
         else:
-            if rec_type is Wrap or rec_type is Generator:
-                assert rec_type is Generator or record.is_packed(), BufferError('The {} is not packed!'.format(record))
+            if isinstance(record, AudioWrap): 
+                assert record.is_packed(), BufferError('The {} is not packed!'.format(record))
                 record = record.get_data()
 
-            elif rec_type is AudioMetadata:
+            elif isinstance(record, AudioMetadata):
                 record = record.copy()
             else:
                 raise TypeError('please control the type of record')
 
 
-        if record['nchannels'] > self._nchannels:
+        if record.nchannels > self._nchannels:
             raise ImportError('number of channel for the {name}({ch0})'
                               ' is not same as object channels({ch1})'.format(name=record.name,
-                                                                              ch0=record['nchannels'],
+                                                                              ch0=record.nchannels,
                                                                               ch1=self._nchannels))
 
-        elif not self._sample_rate == record['frameRate']:
+        elif not self._sample_rate == record.frameRate:
             warnings.warn('Warning, frame rate must be same')
 
-        assert  type(record['o']) is BufferedRandom, TypeError('The record object is not standard')
-        file = record['o']
+        assert  type(record.o) is BufferedRandom, TypeError('The record object is not standard')
+        file = record.o
         file_pos = file.tell()
         tmp = list(file.name)
         tmp.insert(file.name.find(record.name), 'stream_')
@@ -1281,51 +1344,50 @@ class Master:
                 record_size = os.path.getsize(file.name)
                 streamfile_size = os.path.getsize(streamfile_name)
                 file.seek(0, 0)
-                pre_head = file.read(Master.CACHE_INFO + cache_head_check_size)
+                pre_head = file.read(Master.CACHE_INFO_SIZE + cache_head_check_size)
                 file.seek(file_pos, 0)
 
                 if record_size == streamfile_size:
                     pass
-                elif (record_size - record['size']) == streamfile_size:
+                elif (record_size - record.size) == streamfile_size:
                     pass
-                    file_pos = Master.CACHE_INFO
+                    file_pos = Master.CACHE_INFO_SIZE
                 else:
                     raise FileNotFoundError
 
                 streamfile = open(streamfile_name, 'rb+')
 
-                # check compability of two files
-                post_head = streamfile.read(Master.CACHE_INFO + cache_head_check_size)
+                post_head = streamfile.read(Master.CACHE_INFO_SIZE + cache_head_check_size)
                 streamfile.seek(file_pos, 0)
                 if not post_head == pre_head:
                     streamfile.close()
                     raise FileNotFoundError
 
                 if safe_load:
-                    record['o'] = streamfile.read()
+                    record.o = streamfile.read()
                     record = self._sync_record(record)
                     file.seek(file_pos, 0)
-                record['o'] = streamfile
+                record.o = streamfile
             else:
                 raise FileNotFoundError
 
         except FileNotFoundError:
-            record['o'] = file.read()
+            record.o = file.read()
             if safe_load:
                 record = self._sync_record(record)
             file.seek(file_pos, 0)
 
-            record['o'] = streamfile = (
-                write_to_cached_file(record['size'],
-                            record['frameRate'],
-                            record['sampleFormat'] if record['sampleFormat'] else 0,
-                            record['nchannels'],
+            record.o = streamfile = (
+                write_to_cached_file(record.size,
+                            record.frameRate,
+                            record.sampleFormat if record.sampleFormat else 0,
+                            record.nchannels,
                             file_name=streamfile_name,
-                            data=record['o'],
-                            after_seek=(Master.CACHE_INFO, 0),
+                            data=record.o,
+                            after_seek=(Master.CACHE_INFO_SIZE, 0),
                             after_flush=True)
             )
-            file_pos = Master.CACHE_INFO
+            file_pos = Master.CACHE_INFO_SIZE
 
         if block_mode:
             data_size = self._nperseg * self._nchannels * self._sample_width
@@ -1373,36 +1435,65 @@ class Master:
         assert self.is_started(), "instance not started, use start()"
         return self._master_mute_mode.is_set()
 
-
-    def echo(self, record: Union[Wrap, str, AudioMetadata, Generator]=None,
+    def echo(self, *args: Union[str, AudioMetadata, AudioWrap],
              enable: bool=None, main_output_enable: bool=False):
+        
         """
-        Plays audio through your system's default speakers or web browser if system audio isn't available.
-        
-        You can use this in two ways:
-        1. Play a specific audio record (pass in the 'record' parameter)
-        2. Toggle real-time echo of incoming audio (leave 'record' as None)
-        
+        Play audio or manage audio streaming output functionality.
+
+        Provides flexible audio playback and echo control with multiple input types 
+        and configuration options.
+
         Parameters:
-        - record: The audio you want to play. Can be:
-            - A file path (str)
-            - A Wrap object
-            - AudioMetadata
-            - A Generator
-            Leave empty to control real-time echo instead
-            
-        - enable: Controls echo behavior when record is None:
-            - None: Toggles echo on/off (like a switch)
-            - True: Turns echo on
-            - False: Turns echo off
-            
-        - main_output_enable: Keep the main stream's output on while playing?
-            Defaults to False to avoid audio feedback
-            
-        Note: If system audio fails, it'll try playing through your web browser 
+        -----------
+        
+        *args : str or AudioMetadata or AudioWrap
+            Audio sources to play:
+            - File path (str)
+            - AudioMetadata object
+            - AudioWrap object
+            Multiple sources can be passed simultaneously
+
+        enable : bool, optional
+            Controls real-time echo behavior when no specific audio is provided:
+            - None (default): Toggle echo on/off
+            - True: Enable echo
+            - False: Disable echo
+
+        main_output_enable : bool, default False
+            Determine whether to maintain the main audio stream's output during playback.
+            Helps prevent potential audio feedback.
+
+        Behavior:
+        ---------
+        
+        - With no arguments: Manages real-time echo state
+        - With audio sources: Plays specified audio through default output
+        - Fallback to web audio if system audio is unavailable
+        - Supports multiple audio playbacks
+
+        Note: 
+        -----
+
+        If system audio fails, it'll try playing through your web browser 
         using HTML5 audio (if you're in a supported environment like Jupyter).
+
+        Examples:
+        ---------
+
+            >>> master = sudio.Master()
+            
+            >>> master.add('audio1.ogg')
+            >>> master.add('audio2.ogg')
+
+            >>> # Play multiple audio sources
+            >>> master.echo('audio1', 'audio2.wav')
+            
+            >>> # Toggle real-time echo
+            >>> master.echo(enable=True)
+        
         """
-        if record is None:
+        if not len(args):
             if enable is None:
                 if self._echo_flag.is_set():
                     self._echo_flag.clear()
@@ -1415,56 +1506,99 @@ class Master:
             else:
                 self._echo_flag.clear()
         else:
-            if type(record) is Wrap or type(record) is Generator:
-                assert type(record) is Generator or record.is_packed()
-                record = record.get_data()
+            for rec in args:
+                self._echo(rec, main_output_enable)
+
+    def _echo(
+        self, 
+        record:Union[str, AudioMetadata, AudioWrap],
+        main_output_enable: bool=False
+        ):
+        """
+        Internal method for audio playback with flexible input handling.
+
+        Processes different audio input types and manages playback through 
+        system or web audio output mechanisms.
+
+        Parameters:
+        -----------
+
+        record : str or AudioMetadata or AudioWrap
+            Audio source to play:
+            - File path (str)
+            - AudioMetadata object
+            - AudioWrap object with packed data
+
+        main_output_enable : bool, default False
+            Control main output stream during playback.
+            Helps manage potential audio feedback scenarios.
+
+        Raises:
+        -------
+        
+        ValueError
+            If an unsupported input type is provided.
+        RuntimeError
+            When no compatible audio output method is available.
+
+        Notes:
+        ------
+
+        - Automatically handles different audio input formats
+        - Attempts system audio output with fallback to web audio
+        - Manages echo flag state during playback
+        - Validates output device availability
+        """
+        if isinstance(record, AudioWrap): 
+                assert  record.is_packed(), 'record should be packed!'
+                record_data = record.get_data()
+        else:
+            if isinstance(record, str):
+                record_data = self.load(record, series=True)
+            elif isinstance(record, AudioMetadata):
+                pass
             else:
-                if type(record) is str:
-                    record = self.load(record, series=True)
-                elif type(record) is AudioMetadata:
-                    pass
-                else:
-                    ValueError('unknown type')
+                ValueError('unknown type')
 
-            file = record['o']
-            # file_pos = file.tell()
-            file.seek(0, 0)
-            data = file.read()
-            file.seek(0, 0)
+        file = record_data.o
+        assert not file.closed, "cache file is inaccessible."
+        # file_pos = file.tell()
+        file.seek(0, 0)
+        data = file.read()
+        file.seek(0, 0)
 
-            flg = False
-            # assert self._nchannels == record['nchannels'] and self._sample_width == record['Sample Width']
-            if not main_output_enable and self._echo_flag.is_set():
-                flg = True
-                self._echo_flag.clear()
+        flg = False
+        if not main_output_enable and self._echo_flag.is_set():
+            flg = True
+            self._echo_flag.clear()
 
+        try:
+            assert self._output_device_index, "No output devices were found."
+            write_to_default_output(
+                data,
+                record_data.sampleFormat,
+                record_data.nchannels,
+                record_data.frameRate,
+                self._output_device_index
+            )
+        except Exception as e:
             try:
-                assert self._output_device_index, "No output devices were found."
-                write_to_default_output(
-                    data,
-                    record['sampleFormat'],
-                    record['nchannels'],
-                    record['frameRate'],
-                    self._output_device_index
-                )
-            except Exception as e:
-                try:
-                    if WebAudioIO.is_web_audio_supported():
-                        result = WebAudioIO.play_audio_data(
-                            data, 
-                            record['sampleFormat'], 
-                            record['nchannels'], 
-                            record['frameRate'],
-                            )
-                        assert result
-                        warnings.warn(f'{e}')
-                    else:
-                        raise
-                except:
-                    raise RuntimeError(f"{e}")
-                    
-            if flg:
-                self._echo_flag.set()
+                if WebAudioIO.is_web_audio_supported():
+                    result = WebAudioIO.play_audio_data(
+                        data, 
+                        record_data.sampleFormat, 
+                        record_data.nchannels, 
+                        record_data.frameRate,
+                        )
+                    assert result
+                    warnings.warn(f'{e}')
+                else:
+                    raise
+            except:
+                raise RuntimeError(f"{e}")
+                
+        if flg:
+            self._echo_flag.set()
 
     def disable_echo(self):
         '''
@@ -1476,19 +1610,37 @@ class Master:
 
     def wrap(self, record: Union[str, AudioMetadata]):
         '''
-        wraps a record as a `Generator`.
+        wraps a record as a `AudioWrap`.
         
         :param record: Record to wrap (str or AudioMetadata).
         '''
-        return Generator(self, record)
+        return AudioWrap(self, record)
 
     def _cache(self):
+        """
+        Retrieve a list of unused or orphaned cache files in the audio data directory.
+
+        Scans the audio data directory and identifies cache files that are no longer
+        referenced in the local database, helping manage file system resources.
+
+        Returns:
+        --------
+        list
+            Absolute file paths of cache files not associated with any current audio record.
+
+        Notes:
+        ------
+        - Compares existing files against local database records
+        - Filters out currently used cache files
+        - Useful for identifying potential cleanup candidates
+        """
+
         path = []
         expath = []
         base_len = len(self._audio_data_directory)
         for i in self._local_database.index():
             record = self._local_database.get_record(i)
-            expath.append(record['o'].name[base_len:])
+            expath.append(record.o.name[base_len:])
         path += [i for i in expath if i not in path]
 
         listdir = os.listdir(self._audio_data_directory)
@@ -1547,6 +1699,17 @@ class Master:
 
 
     def _refresh(self, *args):
+        """
+        Resets and reconfigures the signal processing buffers when things change.
+
+        Handles window length updates, regenerates window functions, and clears 
+        internal buffers. Useful when you need to adjust processing parameters 
+        on the fly without completely rebuilding the entire stream setup.
+
+        Optionally takes arguments for specific refresh scenarios, but can also 
+        do a standard refresh based on current config.
+        """
+
         win_len = self._nperseg
 
         if len(args):
@@ -1653,6 +1816,7 @@ class Master:
          In mono mode [self.nchannel = 1 or mono mode activated], channel must be None.
         
         Note:
+        
          The pipeline must process data and return it to the core with the dimensions as same as the input.
 
         """
@@ -1690,22 +1854,19 @@ class Master:
             name = stream.name
 
         try:
-            # Find the specified pipeline
+            # find the specified pipeline
             pipeline = next(obj for obj in self.main_pipe_database if obj.name == name)
             
             assert pipeline.process_type in [PipelineProcessType.MAIN, PipelineProcessType.MULTI_STREAM], \
                 f"Pipeline {name} is not a MAIN or MULTI_STREAM type"
 
             try:
-                # Disable the current pipeline if it exists
                 self.disable_pipeline()
             except ValueError:
                 pass
             
-            # Acquire the lock before modifying the main stream
             self._main_stream.acquire()
             try:
-                # Set the new pipeline
                 self._main_stream.set(pipeline)
                 
                 if pipeline.process_type == PipelineProcessType.MULTI_STREAM:
@@ -1893,6 +2054,12 @@ class Master:
         Returns the sample format of the master instance.
         '''
         return self._sample_format_type
+
+    def _get_sample_format(self):
+        '''
+        Returns the sample format of the master instance.
+        '''
+        return self._sample_format
 
     @staticmethod
     def get_default_input_device_info()-> AudioDeviceInfo:

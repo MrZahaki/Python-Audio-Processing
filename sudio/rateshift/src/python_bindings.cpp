@@ -1,10 +1,22 @@
 /*
- -- W.T.A
- -- SUDIO (https://github.com/MrZahaki/sudio)
- -- The Audio Processing Platform
- -- Mail: mrzahaki@gmail.com
- -- Software license: "Apache License 2.0". 
-*/
+ * SUDIO - Audio Processing Platform
+ * Copyright (C) 2024 Hossein Zahaki
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * - GitHub: https://github.com/MrZahaki/sudio
+ */
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
@@ -13,7 +25,7 @@
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(rateshift, m) {
+PYBIND11_MODULE(_rateshift, m) {
 
     py::enum_<rateshift::ConverterType>(m, "ConverterType")
         .value("sinc_best", rateshift::ConverterType::sinc_best)

@@ -1,16 +1,28 @@
 
-#  W.T.A
-#  SUDIO (https://github.com/MrZahaki/sudio)
-#  The Audio Processing Platform
-#  Mail: mrzahaki@gmail.com
-#  Software license: "Apache License 2.0". See https://choosealicense.com/licenses/apache-2.0/
+# SUDIO - Audio Processing Platform
+# Copyright (C) 2024 Hossein Zahaki
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+# - GitHub: https://github.com/MrZahaki/sudio
+
 
 
 import threading
 import queue
 import numpy as np
 
-from sudio.utils.arraytool import push
 from sudio.types import StreamError, PipelineProcessType
 
 
@@ -187,7 +199,9 @@ class Stream:
                 (self.process_obj._windowing_buffer[0][1][self.process_obj._nhop:],
                  self.process_obj._windowing_buffer[0][0][:self.process_obj._nhop])))) * self.process_obj._window
 
-            push(self.process_obj._windowing_buffer[0], data[0])
+            obj = self.process_obj._windowing_buffer[0]
+            obj.pop()
+            obj.insert(0, data[0])
 
             try:
                 self.pip[0].put(win)
@@ -200,7 +214,9 @@ class Stream:
                     (self.process_obj._windowing_buffer[i][1][self.process_obj._nhop:],
                      self.process_obj._windowing_buffer[i][0][:self.process_obj._nhop])))) * self.process_obj._window
 
-                push(self.process_obj._windowing_buffer[i], data[i])
+                obj = self.process_obj._windowing_buffer[i]
+                obj.pop()
+                obj.insert(0, data[i])
 
                 try:
                     self.pip[i].put(win)

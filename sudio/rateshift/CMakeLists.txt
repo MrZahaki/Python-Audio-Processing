@@ -1,10 +1,11 @@
 
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.20)
 project(python_rateshift LANGUAGES CXX)
 
 set(LIBSAMPLERATE_VERSION 0.2.2)
 set(BUILD_TESTING OFF CACHE BOOL "Disable libsamplerate test build")
+
 
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libsamplerate")
     include(FetchContent)
@@ -52,7 +53,7 @@ target_compile_definitions(python_rateshift
 set_target_properties(python_rateshift
     PROPERTIES
         PREFIX ""
-        OUTPUT_NAME "rateshift"
+        OUTPUT_NAME "_rateshift"
         LINKER_LANGUAGE CXX
 )
 

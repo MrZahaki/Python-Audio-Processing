@@ -1,90 +1,95 @@
 
-#  W.T.A
-#  SUDIO (https://github.com/MrZahaki/sudio)
-#  The Audio Processing Platform
-#  Mail: mrzahaki@gmail.com
-#  Software license: "Apache License 2.0". See https://choosealicense.com/licenses/apache-2.0/
+# SUDIO - Audio Processing Platform
+# Copyright (C) 2024 Hossein Zahaki
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+# - GitHub: https://github.com/MrZahaki/sudio
+
 
 
 import numpy as np
-from sudio.rateshift import rateshift
+from sudio.rateshift import ConverterType, resample
 from sudio.io import SampleFormat
 from sudio.io import get_sample_size
-from sudio.audiosys.channel import shuffle2d_channels
+from sudio.utils.channel import shuffle2d_channels
+from sudio.metadata import AudioMetadata
 
 
-def synchronize_audio(rec,
+def synchronize_audio(rec: AudioMetadata,
                       nchannels: int,
                       sample_rate: int,
                       sample_format_id: int,
                       output_data='byte') -> dict:
     """
-    Synchronizes audio data with the specified parameters.
+    Synchronizes and transforms audio recording parameters.
 
-    Parameters:
-    - rec (dict): The input audio recording data.
-    - nchannels (int): The desired number of channels.
-    - sample_rate (int): The desired sample rate.
-    - sample_format_id (int): The desired sample format ID.
-    - output_data (str): Output data format, can be 'byte' or 'ndarray'.
+    Modifies audio recording by adjusting channels, resampling, 
+    and converting sample format.
+
+    Args:
+    -----
+
+        - rec: Audio recording metadata
+        - nchannels: Desired number of audio channels
+        - sample_rate: Target sample rate
+        - sample_format_id: Desired audio sample format
+        - output_data: Output data format ('byte' or 'ndarray')
 
     Returns:
-    - dict: The synchronized audio recording data.
+    --------
 
-    Notes:
-    - This function performs channel adjustment, resampling, and sample format conversion.
-    - The input `rec` dictionary is modified in-place.
-
-    Usage:
-    ```python
-    new_rec = synchronize_audio(rec, nchannels=2, sample_rate=44100, sample_format_id=SampleFormat.SIGNED16.value)
-    ```
-
-    :param rec: The input audio recording data.
-    :param nchannels: The desired number of channels.
-    :param sample_rate: The desired sample rate.
-    :param sample_format_id: The desired sample format ID.
-    :param output_data: Output data format, can be 'byte' or 'ndarray'.
-    :return: The synchronized audio recording data.
+        - Modified audio recording metadata
     """
 
-    form = get_sample_size(rec['sampleFormat'])
-    if rec['sampleFormat'] == SampleFormat.FLOAT32:
+    form = get_sample_size(rec.sampleFormat)
+    if rec.sampleFormat == SampleFormat.FLOAT32:
         form = '<f{}'.format(form)
     else:
         form = '<i{}'.format(form)
-    data = np.frombuffer(rec['o'], form)
-    if rec['nchannels'] == 1:
-        if nchannels > rec['nchannels']:
+    data = np.frombuffer(rec.o, form)
+    if rec.nchannels == 1:
+        if nchannels > rec.nchannels:
             data = np.vstack([data for i in range(nchannels)])
-            rec['nchannels'] = nchannels
+            rec.nchannels = nchannels
 
     else:
         # Safety update: Ensure all arrays have the same size
-        channel_data = [data[i::rec['nchannels']] for i in range(nchannels)]
+        channel_data = [data[i::rec.nchannels] for i in range(nchannels)]
         min_length = min(len(channel) for channel in channel_data)
         channel_data = [channel[:min_length] for channel in channel_data]
         data = np.array(channel_data)
 
-    if not sample_rate == rec['frameRate']:
-        scale = sample_rate / rec['frameRate']
+    if not sample_rate == rec.frameRate:
+        scale = sample_rate / rec.frameRate
 
         if len(data.shape) == 1:
             # mono
-            data = rateshift.resample(data, scale, rateshift.ConverterType.sinc_fastest, 1)
+            data = resample(data, scale, ConverterType.sinc_fastest, 1)
         else:
             # multi channel
-            res = rateshift.resample(data[0], scale, rateshift.ConverterType.sinc_fastest, 1)
+            res = resample(data[0], scale, ConverterType.sinc_fastest, 1)
             for i in data[1:]:
                 res = np.vstack((res,
-                                 rateshift.resample(i, scale, rateshift.ConverterType.sinc_fastest, 1)))
+                                 resample(i, scale, ConverterType.sinc_fastest, 1)))
             data = res
 
-    if output_data.startswith('b') and rec['nchannels'] > 1:
+    if output_data.startswith('b') and rec.nchannels > 1:
         data = shuffle2d_channels(data)
 
-    rec['nchannels'] = nchannels
-    rec['sampleFormat'] = sample_format_id
+    rec.nchannels = nchannels
+    rec.sampleFormat = sample_format_id
 
     form = get_sample_size(sample_format_id)
     if sample_format_id == SampleFormat.FLOAT32:
@@ -93,15 +98,15 @@ def synchronize_audio(rec,
         form = '<i{}'.format(form)
 
     if output_data.startswith('b'):
-        rec['o'] = data.astype(form).tobytes()
+        rec.o = data.astype(form).tobytes()
     else:
-        rec['o'] = data.astype(form)
+        rec.o = data.astype(form)
 
-    rec['size'] = len(rec['o'])
-    rec['frameRate'] = sample_rate
+    rec.size = len(rec.o)
+    rec.frameRate = sample_rate
 
-    rec['duration'] = rec['size'] / (rec['frameRate'] *
-                                     rec['nchannels'] *
-                                     get_sample_size(rec['sampleFormat']))
+    rec.duration = rec.size / (rec.frameRate *
+                                     rec.nchannels *
+                                     get_sample_size(rec.sampleFormat))
 
     return rec

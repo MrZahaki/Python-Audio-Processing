@@ -15,22 +15,12 @@ Audiosys Module
 
 
 
-.. automodule:: sudio.audiosys.channel
+.. automodule:: sudio.audiosys.cacheman
    :members:
    :undoc-members:
    :show-inheritance:
 
 .. automodule:: sudio.audiosys.sync
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-.. automodule:: sudio.audiosys.typeconversion
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-.. automodule:: sudio.audiosys.window
    :members:
    :undoc-members:
    :show-inheritance:
