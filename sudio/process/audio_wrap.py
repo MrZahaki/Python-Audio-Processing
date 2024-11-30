@@ -935,7 +935,7 @@ class AudioWrap:
         :type output_gain_db: float, optional
         :param wet_mix: Effect mix ratio (0.0 to 1.0), optional
         :type wet_mix: float, optional
-        :return: Self with applied effect
+        :return: new AudioWrap instance with applied effect
         :rtype: AudioWrap
 
         :raises TypeError: If effect class is not supported
@@ -944,14 +944,15 @@ class AudioWrap:
         """
         assert issubclass(cls, FX), TypeError('unsupported parameter')
         
+        other = self()
         common_args = {
-            'data_size': self._size,
-            'sample_rate': self._sample_rate,
-            'nchannels': self._nchannels,
-            'sample_format': self._sample_format,
-            'data_nperseg': self._nperseg,
-            'sample_type': self._sample_type,
-            'sample_width': self.sample_width,
+            'data_size': other._size,
+            'sample_rate': other._sample_rate,
+            'nchannels': other._nchannels,
+            'sample_format': other._sample_format,
+            'data_nperseg': other._nperseg,
+            'sample_type': other._sample_type,
+            'sample_width': other.sample_width,
         }
         
         fx = cls(
@@ -969,10 +970,10 @@ class AudioWrap:
         if start is not None and stop is not None:
             assert start < stop, 'start time should be lower'
         
-        assert self._packed, AttributeError('must be packed')
+        assert other._packed, AttributeError('must be packed')
 
         dtype = fx.get_preferred_datatype()
-        with self.unpack(
+        with other.unpack(
             astype=dtype, 
             start=start, 
             stop=stop,
@@ -990,9 +991,9 @@ class AudioWrap:
                     refined = data * (1 - wet_mix) + refined * wet_mix
                 else:
                     warnings.warn("wet_mix is not supported for this fx")
-            self._data = refined
+            other._data = refined
         
-        return self
+        return other
 
     @staticmethod
     def _slice_type(item: slice):

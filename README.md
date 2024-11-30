@@ -44,7 +44,7 @@ song = su.add('awesome_track.ogg')
 
 # Slice, mix, and transform audio with ease
 remix = song[10: 30]  + song[10.15: 25: .95, :'300'] * -10
-remix.afx(FadeEnvelope, preset=FadePreset.LINEAR_FADE_IN)
+remix = remix.afx(FadeEnvelope, preset=FadePreset.LINEAR_FADE_IN)
 
 # Play and export the transformed audio
 su.echo(remix)

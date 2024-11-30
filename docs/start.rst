@@ -182,7 +182,7 @@ The scale is converted from dB to amplitude using a formula, and soft clipping i
     song = su.add('somewhere_only_we_know.mp3')[10:20]
 
     # Apply dynamic gain adjustment from 2s to 5s in the segment
-    song.afx(Gain, gain_db=-30, start=2, stop=5, wet_mix=0.9)
+    song = song.afx(Gain, gain_db=-30, start=2, stop=5, wet_mix=0.9)
 
     su.echo(song)
 
@@ -332,7 +332,7 @@ Apply gain adjustments to specific segments with fine-grained control:
     song = su.add('somewhere_only_we_know.mp3')[10:20]
 
     # Reduce volume by -30 dB from 2s to 5s within the segment
-    song.afx(Gain, gain_db=-30, start=2, stop=5, wet_mix=0.9)
+    song = song.afx(Gain, gain_db=-30, start=2, stop=5, wet_mix=0.9)
     su.echo(song)
 
 Parameters for afx() method:
@@ -359,7 +359,7 @@ Dynamically modify audio tempo:
     song = su.add('somewhere_only_we_know.mp3')[10:20]
 
     # Slow down segment to 0.8x speed 
-    song.afx(Tempo, tempo=0.8, output_gain_db=1)
+    song = song.afx(Tempo, tempo=0.8, output_gain_db=1)
     su.echo(song)
 
 Envelope Shaping with FadeEnvelope
@@ -378,18 +378,18 @@ Apply various envelope presets or create custom amplitude shapes. For more detai
 
     # Predefined Envelope Presets
     # Smooth fade at segment ends
-    song.afx(FadeEnvelope, preset=FadePreset.SMOOTH_ENDS, output_gain_db=1)
+    song = song.afx(FadeEnvelope, preset=FadePreset.SMOOTH_ENDS, output_gain_db=1)
 
     # Bell curve envelope
-    song.afx(FadeEnvelope, preset=FadePreset.BELL_CURVE, start=10, stop=20)
+    song = song.afx(FadeEnvelope, preset=FadePreset.BELL_CURVE, start=10, stop=20)
 
     # Keep only the attack portion
-    song.afx(FadeEnvelope, preset=FadePreset.KEEP_ATTACK_ONLY, 
+    song = song.afx(FadeEnvelope, preset=FadePreset.KEEP_ATTACK_ONLY, 
             start=20, stop=30, input_gain_db=1)
 
     # Custom envelope with spline interpolation
     custom_envelope = np.array([0.0, 0.0, 0.1, 0.2, 0.3, 0.7, 0.1, 0.0])
-    song.afx(FadeEnvelope, preset=custom_envelope, 
+    song = song.afx(FadeEnvelope, preset=custom_envelope, 
             start=30, stop=40, output_gain_db=1, 
             enable_spline=True)
 
