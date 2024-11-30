@@ -689,12 +689,12 @@ class Master:
                 self._audio_data_directory + name + Master.BUFFER_TYPE,
                 start_before=Master.BUFFER_TYPE
                 )
-        cache_info = self._cache()
+        orphaned_cache = self.prune_cache()
 
         record = handle_cached_record(
             record=record,
             path_server=path_server,
-            cache_info=cache_info,
+            orphaned_cache=orphaned_cache,
             cache_info_size=self.__class__.CACHE_INFO_SIZE,
             decoder=decoder,
             sync_sample_format_id=self._sample_format,
@@ -1131,7 +1131,7 @@ class Master:
 
         gc.collect()
 
-    def export(self, record: Union[str, AudioMetadata, AudioWrap], file_path: str = './', format: FileFormat = FileFormat.UNKNOWN, quality: float = 0.5, bitrate: int = 128):
+    def export(self, obj: Union[str, AudioMetadata, AudioWrap], file_path: str = './', format: FileFormat = FileFormat.UNKNOWN, quality: float = 0.5, bitrate: int = 128):
         '''
         Exports a record to a file in WAV, MP3, FLAC, or VORBIS format. The output format can be specified either through the `format` 
         argument or derived from the file extension in the `file_path`. If a file extension ('.wav', '.mp3', '.flac', or '.ogg') is 
@@ -1139,7 +1139,7 @@ class Master:
         `format` argument is used, defaulting to WAV if set to FileFormat.UNKNOWN. The exported file is saved at the 
         specified `file_path`.
 
-        :param record: Record to export (str, AudioMetadata, or AudioWrap).
+        :param obj: Record to export (str, AudioMetadata, or AudioWrap).
                     - str: Path to a file to be loaded and exported.
                     - AudioMetadata: A metadata object containing audio data.
                     - AudioWrap: Objects that wrap or generate the audio data.
@@ -1159,16 +1159,16 @@ class Master:
 
         Raises:
 
-        - TypeError: Raised if `record` is not one of the expected types (str, AudioMetadata, or AudioWrap).
+        - TypeError: Raised if `obj` is not one of the expected types (str, AudioMetadata, or AudioWrap).
         - ValueError: Raised if an unsupported format is provided.
         '''
 
         file_path = file_path.strip()
-        if isinstance(record, str): 
-            record = self.load(record, series=True)
-        elif isinstance(record, AudioWrap):
-            record = record.get_data()
-        elif isinstance(record, AudioMetadata):
+        if isinstance(obj, str): 
+            record = self.load(obj, series=True)
+        elif isinstance(obj, AudioWrap):
+            record = obj.get_data()
+        elif isinstance(obj, AudioMetadata):
             pass
         else:
             raise TypeError('please control the type of record')
@@ -1616,7 +1616,7 @@ class Master:
         '''
         return AudioWrap(self, record)
 
-    def _cache(self):
+    def prune_cache(self):
         """
         Retrieve a list of unused or orphaned cache files in the audio data directory.
 
@@ -1665,7 +1665,7 @@ class Master:
         The function implements retry logic for handling permission errors and ensures
         files are properly deleted across different operating systems.
         '''
-        cache = self._cache()
+        cache = self.prune_cache()
         
         for file_path in cache:
             path = Path(file_path)

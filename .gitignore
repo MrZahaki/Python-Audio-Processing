@@ -43,8 +43,9 @@ sudio/process/fx/*.cpp
 docs/_build
 docs/doxyoutput
 docs/api
+docs/_static/sudio
+docs/_static/*.mp3
 examples/
-
 # PyInstaller
 *.manifest
 *.spec

@@ -14,6 +14,9 @@
 [![Python Version](https://img.shields.io/pypi/pyversions/sudio.svg)](https://pypi.org/project/sudio/)
 [![Supported OS](https://img.shields.io/badge/OS-Linux%20%7C%20macOS%20%7C%20Windows-blue)](https://shields.io/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrzahaki/sudio/tree/Master/docs/_static/sudio.ipynb)
+  
+
 
 Sudio is a Python audio processing library that provides developers and audio enthusiasts with a comprehensive toolkit for advanced sound manipulation. It offers intuitive, high-performance methods for time-domain audio editing, spectral filtering, dynamic effect application, and audio streaming, enabling complex audio transformations with minimal code complexity.
 
@@ -40,7 +43,7 @@ from sudio.process.fx import FadeEnvelope, FadePreset
 su = sudio.Master()
 
 # Load an audio file
-song = su.add('awesome_track.ogg')
+song = su.add('track.ogg')
 
 # Slice, mix, and transform audio with ease
 remix = song[10: 30]  + song[10.15: 25: .95, :'300'] * -10
@@ -48,10 +51,16 @@ remix = remix.afx(FadeEnvelope, preset=FadePreset.LINEAR_FADE_IN)
 
 # Play and export the transformed audio
 su.echo(remix)
-su.export(remix, 'cool_remix.mp3')
+su.export(remix, 'remix.mp3')
 ```
 
  the original 20-second segment (10-30 seconds) is layered with a slightly time-shifted slice, filtered to low frequencies below 300 Hz, with .95 original speed, and dramatically attenuated by -10 dB to create a subtle, atmospheric undertone. The LINEAR_FADE_IN envelope effect adds a gradual volume increase, creating a smooth, building intensity to the remix. 
+
+
+### Explore Sudio
+
+Get started with `Sudio` processing in minutes using [Google Colab](https://colab.research.google.com/github/mrzahaki/sudio/tree/Master/docs/_static/sudio.ipynb)!
+
 
 ## 🎹 Key Features
 - Handles both real-time streaming and offline processing, allowing for dynamic applications like live audio effects as well as batch processing of audio files.
@@ -67,9 +76,6 @@ su.export(remix, 'cool_remix.mp3')
 
 For detailed documentation and examples, visit the [Sudio Documentation](http://sudio.rtfd.io/).
 
-## 🤝 Contributing
-
-Sudio is like a symphony in progress, and we'd love for you to join the orchestra! If you're interested in contributing, please check out our [contribution guidelines](https://github.com/mrzahaki/sudio/blob/Master/CONTRIBUTING.md). You can access the source code here at [Sudio GitHub Repository](https://github.com/mrzahaki/sudio).
 
 ## 💖 Support Sudio
 

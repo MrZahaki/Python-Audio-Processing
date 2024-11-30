@@ -150,10 +150,12 @@ def write_to_cached_file(*head,
 
     if data:
         if isinstance(data, io.BufferedRandom):
+            data_position = data.tell()
             buffer = data.read(data_chunk)
             while buffer:
                 size += file.write(buffer)
                 buffer = data.read(data_chunk)
+            data.seek(data_position, 0)
         else:
             size += file.write(data)
 
@@ -170,7 +172,7 @@ def write_to_cached_file(*head,
 
 def handle_cached_record(record: Union[AudioMetadata, dict],
                          path_server: TimedIndexedString,
-                         cache_info:list,
+                         orphaned_cache:list,
                          cache_info_size:str,
                          buffer_type:str=None,
                          decoder: callable = None,
@@ -190,7 +192,7 @@ def handle_cached_record(record: Union[AudioMetadata, dict],
 
        - record (AudioMetadata or dict): Audio record to be processed and cached.
        - path_server (TimedIndexedString): Service for generating unique file paths.
-       - cache_info (list): List tracking existing cache entries.
+       - orphaned_cache (list): List tracking obsolete cache entries.
        - cache_info_size (str): Size of metadata in the cache.
        - buffer_type (str, optional): Type of buffer for filename parsing.
        - decoder (callable, optional): Custom function to decode audio if needed.
@@ -213,81 +215,82 @@ def handle_cached_record(record: Union[AudioMetadata, dict],
    """
 
     path: str = path_server()
-    try:
-        if path in cache_info:
-            attempt = 0
-            while attempt < max_attempts:
-                try:
-                    if not is_file_locked(path):
-                        f = record.o = open(path, 'rb+')
-                        break
-                    else:
-                        new_path = path_server()
-                        if not os.path.exists(new_path) or not is_file_locked(new_path):
-                            # Write a new file based on the new path
-                            data_chunk = int(1e7)
-                            with open(path, 'rb') as pre_file:
-                                f = record.o = open(new_path, 'wb+')
-                                data = pre_file.read(data_chunk)
-                                while data:
-                                    f.write(data)
-                                    data = pre_file.read(data_chunk)
-                            break
-                except (IOError, OSError) as e:
-                    attempt += 1
-                    time.sleep(0.1)  # Short delay before retrying
-
-            if attempt >= max_attempts:
-                raise IOError(f"Unable to access the file after {max_attempts} attempts")
-
-            f.seek(0, 0)
-            cache_info = f.read(cache_info_size)
+    if path in orphaned_cache:
+        attempt = 0
+        while attempt < max_attempts:
             try:
-                csize, csample_rate, csample_format_id, cnchannels = np.frombuffer(cache_info, dtype='u8').tolist()
-                csample_format = SampleFormat(csample_format_id) if csample_format_id else SampleFormat.UNKNOWN
-                
-            except ValueError:
-                # bad cache_info error
-                f.close()
-                os.remove(f.name)
-                raise DecodeError
+                if not is_file_locked(path):
+                    f = open(path, 'rb+')
+                    record.o = f
+                    break
+                else:
+                    new_path = path_server()
+                    if not os.path.exists(new_path) or not is_file_locked(new_path):
+                        # Write a new file based on the new path
+                        data_chunk = int(1e7)
+                        with open(path, 'rb') as pre_file:
+                            pre_file.seek(0, 0)
+                            f = open(new_path, 'wb+')
+                            data = pre_file.read(data_chunk)
+                            while data:
+                                f.write(data)
+                                data = pre_file.read(data_chunk)
+                            record.o = f
+                        break
+            except (IOError, OSError) as e:
+                attempt += 1
+                time.sleep(0.1)  # Short delay before retrying
 
-            csample_format = csample_format if csample_format else None
-            record.size = csize
+        if attempt >= max_attempts:
+            raise IOError(f"Unable to access the file after {max_attempts} attempts")
 
-            record.frameRate = csample_rate
-            record.nchannels = cnchannels
-            record.sampleFormat = csample_format
-
-            if (cnchannels == sync_nchannels and
-                    csample_format == sync_sample_format_id and
-                    csample_rate == sync_sample_rate):
-                pass
-
-            elif safe_load:
-                record.o = f.read()
-                record = synchronize_audio(record,
-                                            sync_nchannels,
-                                            sync_sample_rate,
-                                            sync_sample_format_id)
-
-                f = record.o = write_to_cached_file(record.size,
-                                                       record.frameRate,
-                                                       record.sampleFormat if record.sampleFormat else 0,
-                                                       record.nchannels,
-                                                       buffered_random=f,
-                                                       data=record.o,
-                                                       pre_seek=(0, 0),
-                                                       pre_truncate=True,
-                                                       pre_flush=True,
-                                                       after_seek=(cache_info_size, 0),
-                                                       after_flush=True)
-
-        else:
+        f.seek(0, 0)
+        orphaned_cache = f.read(cache_info_size)
+        try:
+            csize, csample_rate, csample_format_id, cnchannels = np.frombuffer(orphaned_cache, dtype='u8').tolist()
+            csample_format = SampleFormat(csample_format_id) if csample_format_id else SampleFormat.UNKNOWN
+            
+        except ValueError:
+            # bad orphaned_cache error
+            f.close()
+            os.remove(f.name)
             raise DecodeError
 
-    except DecodeError:
-        # Handle decoding error
+        csample_format = csample_format if csample_format else None
+        record.size = csize
+
+        record.frameRate = csample_rate
+        record.nchannels = cnchannels
+        record.sampleFormat = csample_format
+
+        if (cnchannels == sync_nchannels and
+                csample_format == sync_sample_format_id and
+                csample_rate == sync_sample_rate):
+            pass
+
+        elif safe_load:
+            record.o = f.read()
+            record = synchronize_audio(record,
+                                        sync_nchannels,
+                                        sync_sample_rate,
+                                        sync_sample_format_id)
+
+            record.o = write_to_cached_file(record.size,
+                    record.frameRate,
+                    record.sampleFormat if record.sampleFormat else 0,
+                    record.nchannels,
+                    buffered_random=f,
+                    data=record.o,
+                    pre_seek=(0, 0),
+                    pre_truncate=True,
+                    pre_flush=True,
+                    after_seek=(cache_info_size, 0),
+                    after_flush=True
+                    )
+
+
+    else:
+         # Handle decoding error
         if decoder is not None:
             record.o = decoder()
         if isinstance(record.o, io.BufferedRandom):
@@ -295,21 +298,24 @@ def handle_cached_record(record: Union[AudioMetadata, dict],
         else:
             record.size = len(record.o) + cache_info_size
 
-        f = record.o = write_to_cached_file(record.size,
-                                               record.frameRate,
-                                               record.sampleFormat if record.sampleFormat else 0,
-                                               record.nchannels,
-                                               file_name=path,
-                                               data=record.o,
-                                               pre_seek=(0, 0),
-                                               pre_truncate=True,
-                                               pre_flush=True,
-                                               after_seek=(cache_info_size, 0),
-                                               after_flush=True)
+        record.o = write_to_cached_file(
+            record.size,
+            record.frameRate,
+            record.sampleFormat if record.sampleFormat else 0,
+            record.nchannels,
+            file_name=path,
+            data=record.o,
+            pre_seek=(0, 0),
+            pre_truncate=True,
+            pre_flush=True,
+            after_seek=(cache_info_size, 0),
+            after_flush=True
+            )
 
     record.duration = record.size / (record.frameRate *
                                            record.nchannels *
                                            get_sample_size(record.sampleFormat))
+
     if buffer_type is not None:
         post = record.o.name.index(buffer_type)
         pre = max(record.o.name.rfind('\\'), record.o.name.rfind('/'))

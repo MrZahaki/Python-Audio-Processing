@@ -26,6 +26,7 @@ import scipy.signal as scisig
 from contextlib import contextmanager
 from typing import Union
 import warnings
+import gc
 
 
 from sudio.types.name import Name
@@ -218,38 +219,13 @@ class AudioWrap:
         self._master = master
 
 
-    def __call__(self, 
-                 sync_sample_format_id: int = None,
-                 sync_nchannels: int = None,
-                 sync_sample_rate: int = None,
-                 safe_load: bool = True
-                 ):
+    def __call__(self):
         """
-        Create a new instance with synchronized parameters.
-        
-        Returns:
-            AudioWrap: A new instance with synchronized parameters
+        Create a new instance with same parameters.        
         """
-
-        cache_info = self._master._cache()
-        sync_sample_format_id= self._sample_format if sync_sample_format_id is None else sync_sample_format_id
-        sync_nchannels= self._nchannels if sync_nchannels is None else sync_nchannels
-        sync_sample_rate= self._sample_rate if sync_sample_rate is None else sync_sample_rate
-
-        record = handle_cached_record(
-            record=self._rec.copy(),
-            path_server=self._id_generator,
-            cache_info=cache_info,
-            buffer_type=self._buffer_type,
-            cache_info_size=self._cache_info_size,
-            sync_sample_format_id=sync_sample_format_id,
-            sync_nchannels=sync_nchannels,
-            sync_sample_rate=sync_sample_rate,
-            safe_load = safe_load
-            )
-        wrap =  AudioWrap(self._master, record)
-        assert not wrap._rec.o.closed, "Error creating cache file."
-        return wrap
+        self._master.prune_cache()
+        newrec = self._rec.copy()
+        return self._master.add(newrec)
 
     def join(self, *other):
         """
@@ -378,7 +354,7 @@ class AudioWrap:
         astype_backup = None
         bstop = None
         bstart = None
-        
+
         if start is not None:
             assert isinstance(start, (float, int)), 'invalid type'
             assert start >= 0, 'should be greater than zero'
@@ -398,12 +374,14 @@ class AudioWrap:
 
         bsize = bstop - bstart
 
+        assert bsize >= 0, 'bstop should be greater than bstart'
+
         try:
             self._packed = False
             if reset:
                 self.reset()
 
-            with self.get(bstart, 1) as f:
+            with self.get(self._cache_info_size + bstart, 0) as f:
                 data = f.read(bsize)
                 remained_data = f.read()
                 data = self._from_buffer(data)
@@ -428,6 +406,9 @@ class AudioWrap:
                 file.write(data + remained_data)
                 file.flush()
 
+            self._file.seek(self._cache_info_size, 0)
+            self._size = self.get_size()
+            self._rec.size = self._size
             self._data = self._file
 
     def _from_buffer(self, data: bytes) -> np.ndarray:
@@ -600,8 +581,11 @@ class AudioWrap:
             return None
         if not isinstance(t, (int, float)):
             raise ValueError(f"Time value must be numeric, got {type(t)}")
-        if t >= duration:
+        if abs(t) >= duration:
             raise OverflowError(f'Input time ({t}) must be less than the record duration ({duration})')
+        if t < 0:
+            t += duration
+
         return self.time2byte(t)
 
     def _time_slice(self, item):
@@ -688,6 +672,7 @@ class AudioWrap:
                 size = (size // samples_per_frame) * samples_per_frame
                 data = generator.read(size)
                 proceed_data = self._from_buffer(data)
+                proceed_data = proceed_data[:, ::step] if self._nchannels > 1 else proceed_data[::step]
         else:
             start_idx = None if start_byte == 0 else start_byte // samples_per_frame
             stop_idx = None if stop_byte == -1 else stop_byte // samples_per_frame
@@ -865,7 +850,7 @@ class AudioWrap:
             size = os.path.getsize(self._file.name)
             record.size = size
             record.duration = self.byte2time(size)
-            return record
+            return self._rec
         return self._data
 
     def is_packed(self) -> bool:
@@ -977,6 +962,7 @@ class AudioWrap:
             astype=dtype, 
             start=start, 
             stop=stop,
+            truncate=True,
         ) as data:
         
             input_gain = db2amp(input_gain_db)
