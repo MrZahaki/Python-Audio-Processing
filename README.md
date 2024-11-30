@@ -14,8 +14,7 @@
 [![Python Version](https://img.shields.io/pypi/pyversions/sudio.svg)](https://pypi.org/project/sudio/)
 [![Supported OS](https://img.shields.io/badge/OS-Linux%20%7C%20macOS%20%7C%20Windows-blue)](https://shields.io/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrzahaki/sudio/tree/Master/docs/_static/sudio.ipynb)
-  
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrzahaki/sudio/blob/Master/docs/_static/sudio.ipynb)  
 
 
 Sudio is a Python audio processing library that provides developers and audio enthusiasts with a comprehensive toolkit for advanced sound manipulation. It offers intuitive, high-performance methods for time-domain audio editing, spectral filtering, dynamic effect application, and audio streaming, enabling complex audio transformations with minimal code complexity.
@@ -59,7 +58,7 @@ su.export(remix, 'remix.mp3')
 
 ### Explore Sudio
 
-Get started with `Sudio` processing in minutes using [Google Colab](https://colab.research.google.com/github/mrzahaki/sudio/tree/Master/docs/_static/sudio.ipynb)!
+Get started with `Sudio` processing in minutes using [Google Colab](https://colab.research.google.com/github/mrzahaki/sudio/blob/Master/docs/_static/sudio.ipynb)!
 
 
 ## 🎹 Key Features
