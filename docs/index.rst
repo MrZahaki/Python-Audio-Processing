@@ -28,8 +28,8 @@ including slicing, filtering, mixing, and applying effects across different audi
 .. image:: https://static.pepy.tech/badge/sudio
    :target: https://www.pepy.tech/projects/sudio
 
-.. image:: https://readthedocs.org/projects/sudio/badge/?version=latest
-   :target: https://sudio.readthedocs.io/en/latest/?badge=latest
+.. image:: https://img.shields.io/badge/docs-github%20pages-blue
+   :target: https://mrzahaki.github.io/sudio/
 
 .. image:: https://github.com/mrzahaki/sudio/actions/workflows/python-package.yml/badge.svg
    :target: https://github.com/mrzahaki/sudio/actions/workflows/python-package.yml
