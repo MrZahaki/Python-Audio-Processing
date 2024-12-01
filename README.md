@@ -73,7 +73,7 @@ Get started with `Sudio` processing in minutes using [Google Colab](https://cola
 
 ## 📚 Documentation
 
-For detailed documentation and examples, visit the [Sudio Documentation](http://sudio.rtfd.io/).
+For detailed documentation and examples, visit the [Sudio Documentation](https://mrzahaki.github.io/sudio/).
 
 
 ## 💖 Support Sudio
