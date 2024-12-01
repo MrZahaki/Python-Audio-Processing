@@ -9,7 +9,7 @@
 
 [![PyPI version](https://badge.fury.io/py/sudio.svg)](https://badge.fury.io/py/sudio)
 [![PyPI Downloads](https://static.pepy.tech/badge/sudio)](https://www.pepy.tech/projects/sudio)
-[![Documentation Status](https://readthedocs.org/projects/sudio/badge/?version=latest)](https://sudio.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://img.shields.io/badge/docs-github%20pages-blue)](https://mrzahaki.github.io/sudio/)
 [![Build Status](https://github.com/mrzahaki/sudio/actions/workflows/python-package.yml/badge.svg)](https://github.com/mrzahaki/sudio/actions/workflows/python-package.yml)
 [![Python Version](https://img.shields.io/pypi/pyversions/sudio.svg)](https://pypi.org/project/sudio/)
 [![Supported OS](https://img.shields.io/badge/OS-Linux%20%7C%20macOS%20%7C%20Windows-blue)](https://shields.io/)
