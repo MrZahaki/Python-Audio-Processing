@@ -164,7 +164,7 @@ set(
     SUDIO_IO_TARGETS
 
     miniaudio
-    PortAudio
+    portaudio
     mp3lame
     ${OGG_LIBRARY}
     FLAC
