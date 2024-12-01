@@ -17,7 +17,7 @@
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrzahaki/sudio/blob/Master/docs/_static/sudio.ipynb)  
 
 
-Sudio is a Python audio processing library that provides developers and audio enthusiasts with a comprehensive toolkit for advanced sound manipulation. It offers intuitive, high-performance methods for time-domain audio editing, spectral filtering, dynamic effect application, and audio streaming, enabling complex audio transformations with minimal code complexity.
+Sudio is a Python library for audio processing and manipulation, providing set of tools for working with digital audio files. It supports operations like time-domain slicing, frequency filtering, audio mixing, streaming, and effect application across various audio formats, making complex audio engineering tasks accessible through a streamlined, Pythonic interface.
 
 
 ## 🚀 Quick Start

@@ -3,10 +3,9 @@ Welcome to the Sudio 🎵
 =======================
 
 
-`Sudio` is a Python audio manipulation library that provides comprehensive tools for audio processing, including time-domain slicing, speed manipulation, mixing tracks, 
-applying audio effects (like gain adjustment and filtering), audio analysis, format conversion, and streaming with precise playback control. 
-The library offers an intuitive, Pythonic approach to working with audio files, allowing users to easily perform complex audio operations with just a few lines of code.
-
+Sudio is a Python library for audio processing that enables developers to manipulate, edit, and analyze digital audio with ease. 
+It offers a range of tools for working with sound files, 
+including slicing, filtering, mixing, and applying effects across different audio formats.
 
 .. raw:: html
    
@@ -19,6 +18,37 @@ The library offers an intuitive, Pythonic approach to working with audio files, 
    :align: center
    :class: no-click
 
+.. raw:: html
+   
+   <br>
+
+.. image:: https://badge.fury.io/py/sudio.svg
+   :target: https://badge.fury.io/py/sudio
+
+.. image:: https://static.pepy.tech/badge/sudio
+   :target: https://www.pepy.tech/projects/sudio
+
+.. image:: https://readthedocs.org/projects/sudio/badge/?version=latest
+   :target: https://sudio.readthedocs.io/en/latest/?badge=latest
+
+.. image:: https://github.com/mrzahaki/sudio/actions/workflows/python-package.yml/badge.svg
+   :target: https://github.com/mrzahaki/sudio/actions/workflows/python-package.yml
+
+.. image:: https://img.shields.io/pypi/pyversions/sudio.svg
+   :target: https://pypi.org/project/sudio/
+
+.. image:: https://img.shields.io/badge/OS-Linux%20%7C%20macOS%20%7C%20Windows-blue
+   :target: https://shields.io/
+
+.. image:: https://img.shields.io/badge/License-Apache%202.0-blue.svg
+   :target: https://opensource.org/licenses/Apache-2.0
+
+.. image:: https://colab.research.google.com/assets/colab-badge.svg
+   :target: https://colab.research.google.com/github/mrzahaki/sudio/blob/Master/docs/_static/sudio.ipynb
+
+.. raw:: html
+   
+   <br>
 
 .. raw:: html
 
