@@ -1,8 +1,8 @@
 # Workflow for installing dependencies, building Sphinx docs, and deploying to GitHub Pages
 name: Build and Deploy Docs
 on:
-  # push:
-  #   branches: ["Master"]
+  push:
+    branches: ["Master"]
   
   workflow_dispatch:
 
