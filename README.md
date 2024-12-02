@@ -17,14 +17,14 @@
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrzahaki/sudio/blob/Master/docs/_static/sudio.ipynb)  
 
 
-Sudio is a Python library for audio processing and manipulation, providing set of tools for working with digital audio files. It supports operations like time-domain slicing, frequency filtering, audio mixing, streaming, and effect application across various audio formats, making complex audio engineering tasks accessible through a streamlined, Pythonic interface.
+use case of audio processing and manipulation, providing set of tools for working with digital audio files. supports operations like time-domain slicing, frequency filtering, audio mixing, streaming, and effect application across various audio formats, making complex audio engineering tasks accessible through a streamlined, Pythonic interface.
 
 
 ## 🚀 Quick Start
 
 ### Installation
 
-Install Sudio using pip:
+install Sudio using pip:
 
 ```bash
 pip install sudio --upgrade
@@ -32,7 +32,7 @@ pip install sudio --upgrade
 
 ### Basic Usage
 
-Here's an example to get you started with sudio:
+an example to get you started with sudio:
 
 ```python
 import sudio
@@ -62,18 +62,25 @@ Get started with `Sudio` processing in minutes using [Google Colab](https://cola
 
 
 ## 🎹 Key Features
-- Handles both real-time streaming and offline processing, allowing for dynamic applications like live audio effects as well as batch processing of audio files.
-- Allows integration of custom processing modules.
-- Flexible audio playback, precise time-domain slicing, and Comprehensive filtering options
-- Advanced audio manipulation (joining, mixing, shifting)
-- Real-time audio streaming with dynamic control (pause, resume, jump)
-- Custom audio processing pipelines for complex effects
-- Multi-format support with quality-controlled encoding/decoding
+ 
+ Handles both real-time streaming and offline processing, allowing for dynamic applications like live audio effects as well as batch processing of audio files.
+ 
+ Allows integration of custom processing modules.
+ 
+ Flexible audio playback, precise time-domain slicing, and Comprehensive filtering options
+ 
+ Advanced audio manipulation (joining, mixing, shifting)
+ 
+ Real-time audio streaming with dynamic control (pause, resume, jump)
+ 
+ Custom audio processing pipelines for complex effects
+
+ Multi-format support with quality-controlled encoding/decoding
 
 
 ## 📚 Documentation
 
-For detailed documentation and examples, visit the [Sudio Documentation](https://mrzahaki.github.io/sudio/).
+for detailed documentation and examples, visit the [Sudio Documentation](https://mrzahaki.github.io/sudio/).
 
 
 ## 💖 Support Sudio
@@ -84,4 +91,4 @@ I don't need your support. The link below is fake! Don't click on it, and don't 
 
 ## 📄 License
 
-Sudio is released under the GNU AFFERO GENERAL PUBLIC LICENSE Version 3. See the [LICENSE](https://github.com/mrzahaki/sudio/blob/Master/LICENSE) file for details.
+released under the GNU AFFERO GENERAL PUBLIC LICENSE Version 3. See the [LICENSE](https://github.com/mrzahaki/sudio/blob/Master/LICENSE) file for details.
