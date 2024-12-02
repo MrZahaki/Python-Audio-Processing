@@ -3,7 +3,7 @@ Welcome to the Sudio 🎵
 =======================
 
 
-Sudio is a Python library for audio processing that enables developers to manipulate, edit, and analyze digital audio with ease. 
+used to manipulate, edit, and analyze digital audio with ease. 
 It offers a range of tools for working with sound files, 
 including slicing, filtering, mixing, and applying effects across different audio formats.
 
