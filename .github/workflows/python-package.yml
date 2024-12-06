@@ -108,7 +108,7 @@ jobs:
       env:
         CIBW_SKIP: cp36-* pp*
         CIBW_BEFORE_BUILD: >
-          pip install cmake setuptools_scm[toml] wheel pybind11
+          pip install cmake setuptools setuptools_scm[toml] wheel pybind11 cython numpy
           
     - uses: actions/upload-artifact@v3
       with:
@@ -124,7 +124,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v3
       with:
-        python-version: '3.10'
+        python-version: '3.11'
         
     - name: Build sdist
       run: |
