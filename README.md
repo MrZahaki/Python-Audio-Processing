@@ -113,15 +113,12 @@ su.export(
 su.echo(cool_remix)
 ```
 
-#### original
-<audio controls>
-  <source src="https://raw.githubusercontent.com/mrzahaki/sudio/tree/Master/docs/_static/remix.mp3" type="audio/mpeg">
-</audio>
-
 #### Remix
-<audio controls>
-  <source src="https://raw.githubusercontent.com/mrzahaki/sudio/tree/Master/docs/_static/main.mp3" type="audio/mpeg">
-</audio>
+[Listen to the remix](https://raw.githubusercontent.com/mrzahaki/sudio/Master/docs/_static/remix.mp3)
+
+#### Original
+[Listen to the main track](https://raw.githubusercontent.com/mrzahaki/sudio/Master/docs/_static/main.mp3)
+
 
 
 
