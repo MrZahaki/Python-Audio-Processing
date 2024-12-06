@@ -5,7 +5,7 @@
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
 # by the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#  any later version.
 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -82,53 +82,56 @@ class Master:
 
 
 		Parameters
-		----------
+        ----------
+        - input_device_index : int, optional
+            Index of the input audio device. If None, uses the system's default input device.
+        - output_device_index : int, optional
+            Index of the output audio device. If None, uses the system's default output device.
+        - data_format : SampleFormat, default=SampleFormat.SIGNED16
+            Audio sample format (e.g., FLOAT32, SIGNED16, UNSIGNED8)
+        - nperseg : int, default=500
+            Number of samples per segment for windowing and processing
+        - noverlap : int, optional
+            Number of overlapping samples between segments. 
+            If None, defaults to half of nperseg.
+        - window : str, float, tuple, or ndarray, default='hann'
+            Window function type for signal processing:
 
-		- **input_device_index** : Standard input device ID (default: `None`).
-		  If None, uses the system's default input device.
-		- **output_device_index** : Standard output device ID (default: `None`).
-		  If None, uses the system's default output device.
-		- **data_format** : SampleFormat, optional
-		  The sample format of the audio. Default is 16-bit integer (SIGNED16).
-		  Supported formats: FLOAT32, SIGNED32, SIGNED24, SIGNED16, UNSIGNED8.
-		- **nperseg** : int, optional
-		  Number of segments per window. Default is 500.
-		- **noverlap** : int, optional
-		  Number of overlapping segments. If None, defaults to nperseg // 2.
-		- **window** : str, float, tuple, or ndarray, optional
-		  Window type or array. Default is 'hann'.
+            - String: scipy.signal window type (e.g., 'hamming', 'blackman')
+            - Float: Beta parameter for Kaiser window
+            - Tuple: Window name with parameters
+            - ndarray: Custom window values
+            - None: Disables windowing
 
-		  - If string: Specifies a scipy.signal window type (e.g., 'hamming', 'blackman').
-		  - If float: Interpreted as the beta parameter for scipy.signal.windows.kaiser.
-		  - If tuple: First element is the window name, followed by its parameters.
-		  - If ndarray: Direct specification of window values.
-		  - If None: Disables windowing.
+        - NOLA_check : bool, default=True
+            Perform Non-Overlap-Add (NOLA) constraint verification
+        - input_dev_sample_rate : int, default=44100
+            Input device sample rate in Hz. Behavior depends on input:
 
-		- **NOLA_check** : bool, optional
-		  Perform the Non-Overlap-Add (NOLA) check. Default is True.
-		- **input_dev_sample_rate** : int, optional
-		  Sample rate of input device. Default is 48000 Hz. Only used if input_dev_callback is provided.
-		- **input_dev_nchannels** : int, optional
-		  Number of input device channels. Required if input_dev_callback is provided.
-		- **input_dev_callback** : Callable, optional
-		  Input device callback function.
-		  Should return a numpy array of shape (nchannels, nperseg) with appropriate data format.
-		- **output_dev_nchannels** : int, optional
-		  Number of output device channels. Required if output_dev_callback is provided.
-		- **output_dev_callback** : Callable, optional
-		  Output device callback function.
-		  Receives a numpy array of shape (nchannels, nperseg) with processed audio data.
-		- **buffer_size** : int, optional
-		  Size of the sound buffer. Default is 30.
-		- **audio_data_directory** : str, optional
-		  Directory for storing audio data (default: `'./sudio/'`).
+            - If a specific value is provided: Uses the given sample rate
+            - If None: Automatically selects the default sample rate of the input device(if it exist)
+            - If the selected rate is unsupported, raises an error
+            - Recommended range typically between 8000 Hz and 96000 Hz
+
+        - input_dev_nchannels : int, default=2
+            Number of input device channels
+        - input_dev_callback : callable, optional
+            Custom callback for input device processing
+        - output_dev_nchannels : int, default=2
+            Number of output device channels
+        - output_dev_callback : callable, optional
+            Custom callback for output device processing
+        - buffer_size : int, default=30
+            Size of the audio stream buffer
+        - audio_data_directory : str, default='./sudio/'
+            Directory for storing audio data files
 
         Notes
         -----
         
         - Various methods are available for audio processing, pipeline management, and device control.
           Refer to individual method docstrings for details.
-        - The class uses threading for efficient audio stream management.
+        - The class uses multi-threading for efficient audio stream management.
         - Window functions are crucial for spectral analysis and should be chosen carefully.
         - NOLA constraint ensures proper reconstruction in overlap-add methods.
         - Custom callbacks allow for flexible input/output handling but require careful implementation.
@@ -167,6 +170,9 @@ class Master:
         input_channels = int(1e6)
         output_channels = int(1e6)
 
+        if input_dev_sample_rate is not None:
+            assert isinstance(input_dev_sample_rate, int), TypeError('control input_dev_sample_rate')
+
         try:
             if callable(input_dev_callback):
                 self.input_dev_callback = input_dev_callback
@@ -196,7 +202,7 @@ class Master:
                     raise EOFError(f'No input info or device for index {input_device_index}')
 
             try:
-                self._sample_rate = int(dev.default_sample_rate)
+                self._sample_rate = int(dev.default_sample_rate) if input_dev_sample_rate is None else input_dev_sample_rate
                 assert self._sample_rate > 0.0
             except:
                 raise EOFError(f'Input device samplerate unsupported')
@@ -1172,7 +1178,8 @@ class Master:
             pass
         else:
             raise TypeError('please control the type of record')
-        
+        assert 0 <= quality <= 1, ValueError('Invalid quality factor')
+
         p0 = max(file_path.rfind('\\'), file_path.rfind('/'))
         p1 = file_path.rfind('.')
         if p0 < 0:

@@ -26,11 +26,6 @@ utils Module
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: sudio.utils.math
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 .. automodule:: sudio.utils.strtool
    :members:
    :undoc-members:

@@ -38,6 +38,17 @@ Process Module
    :show-inheritance:
 
 
+.. automodule:: sudio.process.fx.channel_mixer
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+.. automodule:: sudio.process.fx.pitch_shifter
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 .. automodule:: sudio.process.fx.fade_envelope
    :members:
    :undoc-members:

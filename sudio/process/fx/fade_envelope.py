@@ -4,7 +4,7 @@
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
 # by the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#  any later version.
 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -20,8 +20,8 @@
 import numpy as np
 from sudio.process.fx import FX
 from sudio.io import SampleFormat
-from sudio._process_fx_fade_envelope import generate_envelope, prepare_envelope
-from sudio._process_fx_fade_envelope import FadePreset as FP
+from sudio.process.fx._fade_envelope import generate_envelope, prepare_envelope
+from sudio.process.fx._fade_envelope import FadePreset as FP
 from enum import Enum
 from typing import Union
 
@@ -159,7 +159,7 @@ class FadeEnvelope(FX):
             
             envelope = prepare_envelope(
             data.shape[-1], 
-            np.array(preset), 
+            np.array(preset, dtype=np.double), 
             **kwargs
             )
         elif isinstance(preset, FadePreset):

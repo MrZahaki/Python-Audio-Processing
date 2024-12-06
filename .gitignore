@@ -40,11 +40,12 @@ sudio/io/ogg/
 sudio/io/vorbis/
 sudio/process/fx/*.c
 sudio/process/fx/*.cpp
+sudio/utils/*.c
+sudio/utils/*.cpp
 docs/_build
 docs/doxyoutput
 docs/api
 docs/_static/sudio
-docs/_static/*.mp3
 examples/
 # PyInstaller
 *.manifest

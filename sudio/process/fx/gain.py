@@ -4,7 +4,7 @@
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
 # by the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#  any later version.
 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -46,7 +46,13 @@ class Gain(FX):
         """
         super().__init__(*args, **kwargs, **features)
 
-    def process(self, data: np.ndarray, gain_db: Union[float, int] = 0.0, **kwargs) -> np.ndarray:
+    def process(
+            self, 
+            data: np.ndarray, 
+            gain_db: Union[float, int] = 0.0, 
+            channel:int=None,
+            **kwargs
+            ) -> np.ndarray:
         """
         Apply dynamic gain adjustment to audio signals with soft clipping.
 

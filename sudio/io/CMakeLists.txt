@@ -155,7 +155,7 @@ endif()
 
 set_target_properties(sudio_io PROPERTIES
     PREFIX ""
-    OUTPUT_NAME "suio"
+    OUTPUT_NAME "_suio"
     LINKER_LANGUAGE CXX
 )
 

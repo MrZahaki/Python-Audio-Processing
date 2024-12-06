@@ -20,42 +20,35 @@
 
 cimport numpy as np
 
-cpdef np.ndarray[double, ndim=1]  generate_envelope(
-    int envlen,
-    FadePreset preset=*,
-    object enable_spline = *,
-    double spline_sigma = *,
-    double fade_max_db = *,
-    double fade_min_db = *,
-    double fade_attack = *,
-    double fade_release = *,
-    int buffer_size = *,
-    double sawtooth_freq = *,
-)
 
-cpdef np.ndarray[double, ndim=1] prepare_envelope(
-    int envlen,
+# cdef int DEFAULT_SEQUENCE_MS = 82
+# cdef int DEFAULT_SEEKWINDOW_MS = 28
+# cdef int DEFAULT_OVERLAP_MS = 12
+
+
+cpdef np.ndarray tempo_cy(
+    np.ndarray input_audio,
     np.ndarray[double, ndim=1] envelope,
+    int sample_rate=*,
+    int sequence_ms=*,
+    int seekwindow_ms=*,
+    int overlap_ms=*,
     bint enable_spline=*,
     double spline_sigma=*,
     double fade_max_db=*,
     double fade_min_db=*,
-    int buffer_size=*
+    int envbuffer=*,
+    int envlen=*,
+    double default_tempo=*
 )
 
-cpdef enum FadePreset:
-    SMOOTH_ENDS
-    BELL_CURVE
-    KEEP_ATTACK_ONLY
-    LINEAR_FADE_IN
-    LINEAR_FADE_OUT
-    PULSE
-    REMOVE_ATTACK
-    SMOOTH_ATTACK
-    SMOOTH_FADE_IN
-    SMOOTH_FADE_OUT
-    SMOOTH_RELEASE
-    TREMORS
-    ZIGZAG_CUT
 
+cpdef np.ndarray _tempo_cy(
+    np.ndarray input_audio,
+    object intp,
+    int sample_rate=*,
+    int sequence_ms=*,
+    int seekwindow_ms=*, 
+    int overlap_ms=*,
+)
 

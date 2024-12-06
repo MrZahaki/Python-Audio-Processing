@@ -55,8 +55,11 @@ autodoc_mock_imports = [
     'sudio.io', 
     'scipy', 
     'numpy',
-    'sudio._process_fx_tempo',
-    'sudio._process_fx_fade_envelope',
+    'sudio.process.fx._tempo',
+    'sudio.process.fx._fade_envelope',
+    'sudio.process.fx._channel_mixer',
+    "sudio.process.fx._pitch_shifter",
+    "sudio.utils.math",
     'sudio._rateshift',
     'sudio.rateshift',
     ]

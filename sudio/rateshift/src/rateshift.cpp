@@ -5,7 +5,7 @@
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published
  * by the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ *  any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -131,23 +131,28 @@ void CallbackResampler::reset() {
 }
 
 std::vector<float> resample(const std::vector<float>& input, double sr_ratio, ConverterType converter_type, int channels) {
+    if (input.size() % channels != 0) {
+        throw std::invalid_argument("Input size must be divisible by number of channels");
+    }
+
     size_t input_frames = input.size() / channels;
     size_t output_frames = static_cast<size_t>(std::ceil(input_frames * sr_ratio));
     std::vector<float> output(output_frames * channels);
 
     SRC_DATA src_data = {
-        const_cast<float*>(input.data()),
-        static_cast<float *>(output.data()),
-        static_cast<long>(input_frames),
-        static_cast<long>(output_frames),
-        0, 0, 0,
-        sr_ratio
+        const_cast<float*>(input.data()),  // Assuming ALREADY INTERLEAVED input
+        static_cast<float*>(output.data()), 
+        static_cast<long>(input_frames),    
+        static_cast<long>(output_frames),   
+        0,  // Input frames used 
+        0,  // Output frames generated 
+        0,  // Input sample rate (0 = same as output)
+        sr_ratio  
     };
 
     error_handler(src_simple(&src_data, convert_type(converter_type), channels));
-
+    
     output.resize(src_data.output_frames_gen * channels);
     return output;
 }
-
 } 

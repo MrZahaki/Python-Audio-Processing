@@ -7,7 +7,7 @@
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
 # by the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#  any later version.
 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -20,38 +20,19 @@
 # - GitHub: https://github.com/MrZahaki/sudio
 
 
-from enum import Enum, auto
 import numpy as np
 cimport numpy as np
 cimport cython
-from libc.math cimport pow, exp
 from scipy.interpolate import interp1d
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal import sawtooth
+from sudio.utils.math cimport db2amp
 
-
-cpdef enum FadePreset:
-    SMOOTH_ENDS
-    BELL_CURVE
-    KEEP_ATTACK_ONLY
-    LINEAR_FADE_IN
-    LINEAR_FADE_OUT
-    PULSE
-    REMOVE_ATTACK
-    SMOOTH_ATTACK
-    SMOOTH_FADE_IN
-    SMOOTH_FADE_OUT
-    SMOOTH_RELEASE
-    TREMORS
-    ZIGZAG_CUT
-
-cdef double db2amp(double db) nogil:
-    return pow(10.0, db / 20.0)
 
 cpdef np.ndarray[double, ndim=1] generate_envelope(
     int envlen,
     FadePreset preset = FadePreset.SMOOTH_ENDS,
-    enable_spline = None,
+    object enable_spline = None,
     double spline_sigma = -1.0,
     double fade_max_db = 0.0,
     double fade_min_db = -60.0,
@@ -237,7 +218,7 @@ cpdef np.ndarray[double, ndim=1] prepare_envelope(
     bint enable_spline = False,
     double spline_sigma = 0.1,
     double fade_max_db = 0.0,
-    double fade_min_db = -60.0,
+    double fade_min_db = -80.0,
     int buffer_size = 400,
 ):
     cdef:

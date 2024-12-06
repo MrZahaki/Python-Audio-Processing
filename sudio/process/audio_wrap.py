@@ -5,7 +5,7 @@
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
 # by the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#  any later version.
 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,27 +18,37 @@
 # - GitHub: https://github.com/MrZahaki/sudio
 
 
-import io
 import os
 import numpy as np
-import time
 import scipy.signal as scisig
 from contextlib import contextmanager
 from typing import Union
 import warnings
-import gc
-
+from enum import Enum, auto
 
 from sudio.types.name import Name
 from sudio.io import SampleFormat, get_sample_size
 from sudio.utils.typeconversion import convert_array_type
 from sudio.utils.strtool import parse_dictionary_string
-from sudio.audiosys.cacheman import write_to_cached_file, handle_cached_record
+from sudio.audiosys.cacheman import write_to_cached_file
 from sudio.utils.timed_indexed_string import TimedIndexedString
 from sudio.metadata import AudioMetadata
-from  sudio._process_fx_tempo import tempo_cy
+from sudio.process.fx._fade_envelope import generate_envelope
+from sudio.process.fx import FadePreset
 from sudio.process.fx import  FX
-from sudio.utils.math import db2amp
+from sudio.utils.math import db2amp, find_nearest_divisible
+
+
+class AFXChannelFillMode(Enum):
+    """
+    Enumeration of different modes for handling length discrepancies 
+    when applying effects to audio channels.
+    """
+    NONE = auto()      # No length adjustment
+    PAD = auto()       # Pad the shorter array to match length
+    TRUNCATE = auto()  # Truncate to the shorter array's length
+    REFERENCE_REFINED = auto()  # Truncate or pad depend on the refined data 
+    REFERENCE_RAW = auto()  # Truncate or pad depend on the original data 
 
 
 class AudioWrap:
@@ -272,7 +282,8 @@ class AudioWrap:
         """
         item = self._parse(item)
         tim = list(item.keys())[1:]
-        data = buffer = []
+        buffer = []
+        data = []
         byte = b''
 
         for obj in tim:
@@ -280,6 +291,7 @@ class AudioWrap:
 
         for idx, obj in enumerate(tim):
             frq, data = item[obj], buffer[idx]
+            
             tmp = []
             if len(frq):
                 # print(data.shape)
@@ -318,8 +330,8 @@ class AudioWrap:
 
         :param reset: Resets the audio pointer to time 0 (Equivalent to slice '[:]').
         :param astype: Target sample format for conversion and normalization
-        :param start: start time.
-        :param stop: stop time.
+        :param start: start time. (assert start < stop) (also accept negative values) 
+        :param stop: stop time. (assert start < stop) (also accept negative values)
         :param truncate: Whether to truncate the file after writing
         :return: Audio data in ndarray format with shape (number of audio channels, block size).
 
@@ -357,14 +369,16 @@ class AudioWrap:
 
         if start is not None:
             assert isinstance(start, (float, int)), 'invalid type'
-            assert start >= 0, 'should be greater than zero'
+            if start < 0:
+                start = self.get_duration() - start
             bstart = self.time2byte(start)
         else:
             bstart = 0
 
         if stop is not None:
             assert isinstance(stop, (float, int)), 'invalid type'
-            assert stop > 0, 'should be greater than zero'
+            if stop < 0:
+                stop = self.get_duration() - stop
             bstop = self.time2byte(stop)
         else:
             bstop = self._size
@@ -373,6 +387,7 @@ class AudioWrap:
             assert stop > start, "invalid parameter"
 
         bsize = bstop - bstart
+        bsize = find_nearest_divisible(bsize, self.sample_width)
 
         assert bsize >= 0, 'bstop should be greater than bstart'
 
@@ -479,13 +494,35 @@ class AudioWrap:
         >>> loud_wrap = wrap * 6     # Increase volume by 6 dB
         >>> soft_wrap = wrap * -6    # Reduce volume by 6 dB
         """
-        assert isinstance(scale, (float, int))
+        assert isinstance(scale, (float, int)), TypeError('Unknown type')
         assert self._packed, AttributeError('must be packed')
 
         scale = db2amp(scale)
         other = self()
         with other.unpack(astype=SampleFormat.FLOAT32) as data:
             other._data = np.tanh(data * scale)
+        return other
+
+    def invert(self):
+        """
+        Invert the audio signal by flipping its polarity.
+
+        Multiplies the audio data by -1.0, effectively reversing the 
+        signal's waveform around the zero axis. This changes the phase 
+        of the audio while maintaining its original magnitude.
+
+        :return: A new AudioWrap instance with inverted audio data
+
+        Examples:
+        ---------
+        >>> wrap = AudioWrap('audio.wav')
+        >>> inverted_wrap = wrap.invert()  # Flip the audio signal's polarity
+        """
+        assert self._packed, AttributeError('must be packed')
+
+        other = self()
+        with other.unpack(astype=SampleFormat.FLOAT32) as data:
+            other._data = data * -1.0
         return other
 
     # def __truediv__(self, scale:Union[int,float]):
@@ -640,6 +677,8 @@ class AudioWrap:
         # Slice and speed up simultaneously
         modified_data = audio_wrap[2:10, 0.8]
         """
+        from  sudio.process.fx._tempo import tempo_cy
+
         item = item or (None, None, None)
         start, stop, step = item
         speed_ratio = step if step is not None else 1.0
@@ -682,7 +721,7 @@ class AudioWrap:
             return proceed_data
 
         dtype = proceed_data.dtype
-        proceed_data = tempo_cy(proceed_data, speed_ratio, self._sample_rate)
+        proceed_data = tempo_cy(proceed_data, np.asarray([]), self._sample_rate, default_tempo=speed_ratio)
         return proceed_data.astype(dtype)
 
 
@@ -699,79 +738,87 @@ class AudioWrap:
             buffer = {-1: -1}
             last_item = [None]
 
+        # Handle single slice or multiple slices
         if isinstance(item, slice):
-            obj_type = AudioWrap._slice_type(item)
+            items = [item]
+        elif isinstance(item, (list, tuple)):
+            items = item
+        else:
+            return buffer
+
+        for current_item in items:
+            if not isinstance(current_item, slice):
+                continue
+
+            obj_type = AudioWrap._slice_type(current_item)
+            
             if obj_type is int:
-                # time
-                last_item[0] = (item.start, item.stop, item.step)
+                # time slice
+                last_item[0] = (current_item.start, current_item.stop, current_item.step)
                 buffer[last_item[0]] = []
-                # print('time', buffer)
 
             elif obj_type is None:
                 last_item[0] = None
                 buffer[None] = []
 
             elif obj_type is str:
-                # Butterworth: ‘butter’
+                # Filter slice
+                filt = {
+                    'ftype': 'butter',
+                    'rs': None,
+                    'rp': None,
+                    'order': 5,
+                    'scale': None
+                }
 
-                # Chebyshev
-                # I: ‘cheby1’
+                # detectparameters
+                if current_item.step:
+                    parsed = parse_dictionary_string(current_item.step, item_sep=',', dict_eq='=')
+                    for key, value in parsed.items():
+                        if key in filt:
+                            filt[key] = value
 
-                # Chebyshev
-                # II: ‘cheby2’
+                # filter type and frequencies
+                if current_item.start is not None and current_item.stop is not None:
+                    if filt['scale'] and float(filt['scale']) < 0:
+                        btype = 'bandstop'
+                    else:
+                        btype = 'bandpass'
+                    freq = float(current_item.start), float(current_item.stop)
+                    assert freq[1] > freq[0], ValueError(f'{freq[0]} is bigger than {freq[1]}')
 
-                # Cauer / elliptic: ‘ellip’
-
-                # Bessel / Thomson: ‘bessel’
-                filt = {'ftype': 'butter',
-                        'rs': None,
-                        'rp': None,
-                        'order': 5,
-                        'scale': None}
-
-                if item.step:
-                    parsed = parse_dictionary_string(item.step, item_sep=',', dict_eq='=')
-                    for i in parsed:
-                        if i in filt:
-                            filt[i] = parsed[i]
-
-                if item.start is not None and item.stop is not None and \
-                        filt['scale'] and float(filt['scale']) < 0:
-                    btype = 'bandstop'
-                    freq = float(item.start), float(item.stop)
-                    assert freq[1] > freq[0], ValueError('{freq0} is bigger than {freq1}'.format(freq0=freq[0],
-                                                                                                 freq1=freq[1]))
-
-                elif item.start is not None and item.stop is not None:
-                    btype = 'bandpass'
-                    freq = float(item.start), float(item.stop)
-                    assert freq[1] > freq[0], ValueError('{freq0} is bigger than {freq1}'.format(freq0=freq[0],
-                                                                                                 freq1=freq[1]))
-                elif item.start is not None:
+                elif current_item.start is not None:
                     btype = 'highpass'
-                    freq = float(item.start)
+                    freq = float(current_item.start)
 
-                elif item.stop is not None:
+                elif current_item.stop is not None:
                     btype = 'lowpass'
-                    freq = float(item.stop)
+                    freq = float(current_item.stop)
 
                 else:
-                    return buffer
+                    continue
 
+                iir = scisig.iirfilter(
+                    filt['order'], 
+                    freq, 
+                    btype=btype, 
+                    fs=self._sample_rate, 
+                    output='sos',
+                    rs=filt['rs'], 
+                    rp=filt['rp'], 
+                    ftype=filt['ftype']
+                )
 
-                # print(btype)
-                iir = scisig.iirfilter(filt['order'], freq, btype=btype, fs=self._sample_rate, output='sos',
-                                       rs=filt['rs'], rp=filt['rp'], ftype=filt['ftype'])
-                if last_item[0] is None:
-                    buffer[None] = []
-                buffer[last_item[0]].append((iir,
-                                             *[abs(float(i)) for i in (filt['scale'],) if i is not None]))
+                #  buffer has an appropriate key
+                buffer_key = last_item[0] if last_item[0] is not None else None
+                if buffer_key not in buffer:
+                    buffer[buffer_key] = []
 
-        elif isinstance(item, (list, tuple)):
-            for item in item:
-                assert isinstance(item, slice)
-                # print(buffer, last_item[0])
-                self._parse(item, buffer=buffer, last_item=last_item)
+                # filter to the buffer
+                buffer[buffer_key].append((
+                    iir, 
+                    *[abs(float(i)) for i in (filt['scale'],) if i is not None]
+                ))
 
         return buffer
 
@@ -899,41 +946,97 @@ class AudioWrap:
         return byte / (self._sample_rate * self._nchannels * self.sample_width)
 
     def afx(self, cls:FX, *args, 
-           start:float=None, 
-           stop:float=None, 
-           input_gain_db:float=0.0, 
-           output_gain_db:float=0.0, 
-           wet_mix:float=None, 
+           start:np.float32=None, 
+           stop:np.float32=None, 
+           duration:np.float32=None, 
+           input_gain_db:np.float32=0.0, 
+           output_gain_db:np.float32=0.0, 
+           wet_mix:np.float32=None, 
+           channel:int=None,
+           channel_fill_mode:AFXChannelFillMode=AFXChannelFillMode.REFERENCE_REFINED,
+           channel_fill_value:np.float32=0.0,
+           transition:FadePreset =None,
            **kwargs):
         """
-        Apply an audio effect to the audio data.
+        Apply an audio effect to the audio data with advanced channel and gain controls.
 
         :param cls: Effect class to apply (must be a subclass of FX)
         :type cls: type[FX]
+
         :param start: Start time for effect application (optional)
         :type start: float, optional
+
         :param stop: Stop time for effect application (optional)
         :type stop: float, optional
+
         :param input_gain_db: Input gain in decibels, defaults to 0.0
         :type input_gain_db: float, optional
+
         :param output_gain_db: Output gain in decibels, defaults to 0.0
         :type output_gain_db: float, optional
+
         :param wet_mix: Effect mix ratio (0.0 to 1.0), optional
+
+            - Blends original and processed signals
+            - Note: Not supported for all effects
+
         :type wet_mix: float, optional
-        :return: new AudioWrap instance with applied effect
+
+        :param channel: Specific channel to apply effect to in multi-channel audio
+
+            - Only applicable for multi-channel audio (>1 channel)
+            - Raises TypeError if used in mono mode
+
+        :type channel: int, optional
+
+        :param channel_fill_mode: Strategy for handling length mismatches between original and processed audio
+
+            - AFXChannelFillMode.PAD: Pad shorter audio with specified fill value
+            - AFXChannelFillMode.TRUNCATE: Truncate to shortest audio length
+            - AFXChannelFillMode.REFERENCE_RAW: 
+
+                * If refined audio is shorter, pad with fill value
+                * If refined audio is longer, truncate to original audio length
+
+            - AFXChannelFillMode.REFERENCE_REFINED: 
+
+                * If refined audio is shorter, truncate original audio to refined length
+                * If refined audio is longer, pad original audio with fill value
+
+        :type channel_fill_mode: AFXChannelFillMode, optional
+
+
+        :param channel_fill_value: Value used for padding when channel_fill_mode is PAD
+        :type channel_fill_value: float, optional
+
+        :return: New AudioWrap instance with applied effect
         :rtype: AudioWrap
 
-        :raises TypeError: If effect class is not supported
+        :raises TypeError: 
+
+            - If effect class is not supported
+            - If channel parameter is invalid
+            - If attempting to use channel in mono mode
+
         :raises AttributeError: If audio data is not packed
         :raises RuntimeError: If channel dimensions are inconsistent
+
         """
         assert issubclass(cls, FX), TypeError('unsupported parameter')
         
         other = self()
+
+        nchannels = other._nchannels
+        if channel is not None:
+            assert isinstance(channel, int), TypeError('Unknown channel type')
+            assert self._nchannels > 1, TypeError('feature not available in MONO mode')
+            assert channel < self._nchannels, TypeError('should be lower than number of audio channels')
+            nchannels = 1
+
         common_args = {
             'data_size': other._size,
             'sample_rate': other._sample_rate,
-            'nchannels': other._nchannels,
+            'nchannels': nchannels,
             'sample_format': other._sample_format,
             'data_nperseg': other._nperseg,
             'sample_type': other._sample_type,
@@ -952,33 +1055,115 @@ class AudioWrap:
             assert isinstance(start, (float, int)), 'Type Error'
         if stop is not None: 
             assert isinstance(stop, (float, int)), 'Type Error'
-        if start is not None and stop is not None:
-            assert start < stop, 'start time should be lower'
-        
+        if duration is not None:
+            assert isinstance(duration, (float, int)), 'Type Error'
+            assert duration > 0, ValueError('negative duration')
+            if stop is None:
+                stop = start + duration
+        if transition is not None:
+                assert isinstance(transition, FadePreset), TypeError('unknown transition')
+                transition = transition.value
+
         assert other._packed, AttributeError('must be packed')
 
         dtype = fx.get_preferred_datatype()
+
+        input_gain = convert_array_type(db2amp(input_gain_db), dtype)
+        output_gain = convert_array_type(db2amp(output_gain_db), dtype)
+
+
         with other.unpack(
             astype=dtype, 
             start=start, 
             stop=stop,
             truncate=True,
-        ) as data:
-        
-            input_gain = db2amp(input_gain_db)
+        ) as pdata:
+            
+            data = pdata
+            if channel is not None:
+                data = pdata[channel]
+
             data_with_input_gain = data * input_gain
             preshape = data_with_input_gain.shape
             refined = fx.process(data_with_input_gain, *args, **kwargs)
-            refined = refined * db2amp(output_gain_db)
-
+            refined = refined * output_gain
+            if transition is not None:
+                envelope = generate_envelope(
+                    refined.shape[-1],
+                    preset=transition,
+                )
+                refined = refined * envelope
+                
             assert len(preshape) == refined.ndim, RuntimeError("different number of channels")
             if wet_mix is not None:
                 if preshape[-1] ==  refined.shape[-1]:
                     refined = data * (1 - wet_mix) + refined * wet_mix
                 else:
                     warnings.warn("wet_mix is not supported for this fx")
+
+            if channel is not None:
+                
+                diff = refined.shape[-1] - pdata.shape[-1]
+
+                if diff == 0:
+                    pass
+                elif channel_fill_mode == AFXChannelFillMode.PAD:
+
+                    pad_length = abs(diff)
+                    
+                    if  diff < 0:
+                        # refined is shorter
+                        refined = np.pad(refined, 
+                                         (0, pad_length), 
+                                         mode='constant', 
+                                         constant_values=channel_fill_value)                        
+                    else:
+                        # pdata is shorter
+                        pdata = np.pad(pdata, 
+                                         ((0, 0), (0, pad_length)),
+                                         mode='constant', 
+                                         constant_values=channel_fill_value)    
+                
+                elif channel_fill_mode == AFXChannelFillMode.TRUNCATE:
+                    if  diff < 0:
+                        # refined is shorter
+                        pdata = pdata[..., :refined.shape[-1]]
+                    else:
+                        # pdata is shorter
+                        refined = refined[:pdata.shape[-1]]
+
+                elif channel_fill_mode == AFXChannelFillMode.REFERENCE_RAW:
+                    pad_length = abs(diff)
+
+                    if  diff < 0:
+                        # refined is shorter
+                        refined = np.pad(refined, 
+                                         (0, pad_length), 
+                                         mode='constant', 
+                                         constant_values=channel_fill_value)    
+                    else:
+                        # pdata is shorter
+                        refined = refined[:pdata.shape[-1]]
+
+                elif channel_fill_mode == AFXChannelFillMode.REFERENCE_REFINED:
+                    pad_length = abs(diff)
+
+                    if  diff < 0:
+                        # refined is shorter
+                        pdata = pdata[..., :refined.shape[-1]] 
+                    else:
+                        # pdata is shorter
+                        pdata = np.pad(pdata, 
+                                         ((0, 0), (0, pad_length)),
+                                         mode='constant', 
+                                         constant_values=channel_fill_value)    
+                
+                pdata[channel] = refined
+                refined = pdata
+
             other._data = refined
-        
+            other._size = os.path.getsize(other._file.name)
+            
         return other
 
     @staticmethod

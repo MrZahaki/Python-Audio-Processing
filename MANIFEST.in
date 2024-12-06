@@ -15,7 +15,7 @@ recursive-include sudio *.cpp
 recursive-include sudio *.txt
 recursive-include sudio/rateshift *
 recursive-include sudio/io *
-
+recursive-include numpy *.h
 recursive-include tests *.py
 
 global-exclude *.pyc

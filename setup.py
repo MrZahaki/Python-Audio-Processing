@@ -5,7 +5,7 @@
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
 # by the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#  any later version.
 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -128,24 +128,57 @@ class CustomBuildExt(build_ext):
         )
 
 
+if sys.platform.startswith('win'):
+    extra_link_args = []
+else:
+    extra_link_args = ['-lm']
+
+
+numpy_include = numpy.get_include()
+
+
 cython_extensions = [
-        Extension(
-        "sudio._process_fx_tempo",
-        ["sudio/process/fx/_tempo.pyx"],
-        include_dirs=[numpy.get_include()],
-        extra_compile_args=["-O3"], 
+    Extension(
+    "sudio.process.fx._tempo",
+    ["sudio/process/fx/_tempo.pyx"],
+    include_dirs=[numpy_include],
+    extra_link_args=extra_link_args,
+    extra_compile_args=["-O3"], 
     ),
     Extension(
-    "sudio._process_fx_fade_envelope",
+    "sudio.process.fx._fade_envelope",
     ["sudio/process/fx/_fade_envelope.pyx"],
-    include_dirs=[numpy.get_include()],
+    extra_link_args=extra_link_args,
+    include_dirs=[numpy_include],
     extra_compile_args=["-O3"], 
-),
+    ),
+    Extension(
+    "sudio.process.fx._channel_mixer",
+    ["sudio/process/fx/_channel_mixer.pyx"],
+    extra_link_args=extra_link_args,
+    include_dirs=[numpy_include],
+    extra_compile_args=["-O3"], 
+    ),
+    Extension(
+    "sudio.process.fx._pitch_shifter",
+    ["sudio/process/fx/_pitch_shifter.pyx"],
+    extra_link_args=extra_link_args,
+    include_dirs=[numpy_include],
+    extra_compile_args=["-O3"], 
+    ),
+    Extension(
+    "sudio.utils.math",
+    ["sudio/utils/math.pyx"],
+    extra_link_args=extra_link_args,
+    include_dirs=[numpy.get_include()], 
+    extra_compile_args=['-O3'],
+    language='c'
+    )
 ]
 
 cmake_extensions = [
     CMakeExtension('sudio._rateshift'), 
-    CMakeExtension('sudio.suio'),
+    CMakeExtension('sudio._suio'),
 ]
 
 cythonized_extensions = cythonize(

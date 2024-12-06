@@ -4,7 +4,7 @@
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
 # by the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#  any later version.
 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,9 +18,10 @@
 
 
 from sudio.process.fx import FX
-from  sudio._process_fx_tempo import tempo_cy
 from sudio.io import SampleFormat
 import numpy as np
+from typing import TYPE_CHECKING
+from  sudio.process.fx._tempo import tempo_cy
 
 class Tempo(FX):
     def __init__(self, *args, **kwargs) -> None:
@@ -29,14 +30,6 @@ class Tempo(FX):
 
         Configures time stretching with support for both streaming and offline 
         audio processing, optimized for 32-bit floating-point precision.
-
-        Parameters:
-        -----------
-        *args : Variable positional arguments
-            Arguments for parent FX class initialization.
-
-        **kwargs : Variable keyword arguments
-            Additional configuration parameters for tempo processing.
 
         Notes:
         ------
@@ -50,49 +43,83 @@ class Tempo(FX):
             }
         super().__init__(*args, **kwargs, **features)
 
-    def process(self, data: np.ndarray, tempo:float=1.0, **kwargs):
+    def process(self, data: np.ndarray, tempo:float=1.0, envelope:np.ndarray=[], **kwargs):
         """
-        Time stretch audio without changing its pitch.
+        Perform time stretching on the input audio data without altering pitch.
 
-        Applies tempo modification using an improved WSOLA algorithm, 
-        allowing precise control over audio playback speed.
+        This method allows tempo modification through uniform or dynamic tempo changes,
+        utilizing an advanced Waveform Similarity Overlap-Add (WSOLA) algorithm to 
+        manipulate audio duration while preserving sound quality and spectral characteristics.
 
         Parameters:
         -----------
-        data : numpy.ndarray
-            Input audio data. Supports mono and multi-channel arrays.
+        data : np.ndarray
+            Input audio data as a NumPy array. Supports mono and multi-channel audio.
+            Recommended data type is float32.
 
         tempo : float, optional
-            Tempo scaling factor:
-            - 1.0 (default): Original tempo
-            - 2.0: Double speed
-            - 0.5: Half speed
+            Tempo scaling factor for time stretching.
+            - 1.0 means no change in tempo/duration
+            - < 1.0 slows down audio (increases duration)
+            - > 1.0 speeds up audio (decreases duration)
+            Default is 1.0.
 
-        **kwargs : dict, optional
-            Additional processing parameters (ignored in this implementation)
+            Examples:
+            - 0.5: doubles audio duration
+            - 2.0: halves audio duration
+
+        envelope : np.ndarray, optional
+            Dynamic tempo envelope for time-varying tempo modifications.
+            Allows non-uniform tempo changes across the audio signal.
+            Default is an empty list (uniform tempo modification).
+
+            Example:
+            - A varying array of tempo ratios can create complex time-stretching effects
+
+        **kwargs : dict
+            Additional keyword arguments passed to the underlying tempo algorithm.
+            Allows fine-tuning of advanced parameters such as:
+            - sequence_ms: Sequence length for time-stretching window
+            - seekwindow_ms: Search window for finding similar waveforms
+            - overlap_ms: Crossfade overlap between segments
+            - enable_spline: Enable spline interpolation for envelope
+            - spline_sigma: Gaussian smoothing parameter for envelope
 
         Returns:
         --------
-        numpy.ndarray
-            Time-stretched audio data with preserved original data type.
-
-        Processing Details:
-        ------------------
-        - Maintains original audio quality
-        - Preserves spectral characteristics
-        - Supports variable tempo scaling
-        - Handles both single and multi-channel audio
+        np.ndarray
+            Time-stretched audio data with the same number of channels and original data type
+            as the input.
 
         Examples:
         ---------
-        >>> import numpy as np
-        >>> from sudio.process.fx import Tempo
-        >>> audio_data = np.random.randn(44100)  # Example audio
-        >>> tempo_fx = Tempo()
-        >>> stretched_audio = tempo_fx.process(audio_data, tempo=1.5)  # 1.5x speed
+        >>> slow_audio = tempo_processor.process(audio_data, tempo=0.5)  # Slow down audio
+        >>> fast_audio = tempo_processor.process(audio_data, tempo=1.5)  # Speed up audio
+        >>> dynamic_tempo = tempo_processor.process(audio_data, envelope=[0.5, 1.0, 2.0])  # Dynamic tempo
+
+        Notes:
+        ------
+        - Preserves audio quality with minimal artifacts
+        - Uses advanced WSOLA algorithm for smooth time stretching
+        - Supports both uniform and dynamic tempo modifications
+        - Computationally efficient implementation
+        - Does not change the pitch of the audio
+
+        Warnings:
+        ---------
+        - Extreme tempo modifications (very low or high values) may introduce 
+        audible artifacts or sound distortions
+        - Performance and quality may vary depending on audio complexity
         """
+
         dtype = data.dtype
-        data = tempo_cy(data, tempo, self._sample_rate)
+        data = tempo_cy(
+            data, 
+            np.asarray(envelope, dtype=np.double), 
+            self._sample_rate, 
+            default_tempo=tempo, 
+            **kwargs
+            )
         return data.astype(dtype)
     
     

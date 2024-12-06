@@ -1,1 +1,1 @@
-from sudio.suio import *
+from sudio._suio import *

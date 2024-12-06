@@ -5,7 +5,7 @@
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
 # by the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#  any later version.
 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -73,17 +73,10 @@ def synchronize_audio(rec: AudioMetadata,
 
     if not sample_rate == rec.frameRate:
         scale = sample_rate / rec.frameRate
-
-        if len(data.shape) == 1:
-            # mono
-            data = resample(data, scale, ConverterType.sinc_fastest, 1)
-        else:
-            # multi channel
-            res = resample(data[0], scale, ConverterType.sinc_fastest, 1)
-            for i in data[1:]:
-                res = np.vstack((res,
-                                 resample(i, scale, ConverterType.sinc_fastest, 1)))
-            data = res
+        dtype = data.dtype
+        data = data.astype(np.float32)
+        data = resample(data, scale, ConverterType.sinc_fastest)
+        data.astype(dtype)
 
     if output_data.startswith('b') and rec.nchannels > 1:
         data = shuffle2d_channels(data)

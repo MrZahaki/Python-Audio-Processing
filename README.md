@@ -36,24 +36,98 @@ an example to get you started with sudio:
 
 ```python
 import sudio
-from sudio.process.fx import FadeEnvelope, FadePreset
-
-# Initialize Sudio Master
+from sudio.process.fx import (
+    PitchShifter, 
+    Tempo, 
+    ChannelMixer, 
+    FadeEnvelope, 
+    FadePreset
+)
 su = sudio.Master()
 
-# Load an audio file
-song = su.add('track.ogg')
+song = su.add('./Farhad Jahangiri - 5 Sobh (320).mp3')
 
-# Slice, mix, and transform audio with ease
-remix = song[10: 30]  + song[10.15: 25: .95, :'300'] * -10
-remix = remix.afx(FadeEnvelope, preset=FadePreset.LINEAR_FADE_IN)
+cool_remix = (
+    song[:40]
+    .afx(
+        PitchShifter, 
+        semitones=-3
+    ).afx(
+        PitchShifter, 
+        start=2,
+        duration=0.8,
+        envelope=[0.8, 2, 1]
+    ).afx(
+        PitchShifter, 
+        start=10,
+        duration=0.8,
+        envelope=[0.65, 3, 1]
+    ).afx(
+        PitchShifter, 
+        start=20,
+        duration=0.8,
+        envelope=[2, 0.7, 1]
+    ).afx(
+        PitchShifter, 
+        start=30,
+        duration=4,
+        envelope=[1, 3, 1, 1]
+    ).afx(
+        Tempo,
+        envelope=[1, 0.95, 1.2, 1]
+    ).afx(
+        FadeEnvelope, 
+        start=0,
+        stop=10,
+        preset=FadePreset.SMOOTH_FADE_IN
+    )
+)
 
-# Play and export the transformed audio
-su.echo(remix)
-su.export(remix, 'remix.mp3')
+side_slide  = (
+    song[:10].afx(
+        ChannelMixer, 
+        correlation=[[0.4, -0.6], [0, 1]]
+    ).afx(
+        FadeEnvelope, 
+        preset=FadePreset.SMOOTH_FADE_OUT
+    )
+)
+
+cool_remix = side_slide  + cool_remix 
+
+# simple 4 band EQ
+cool_remix = cool_remix[
+        : '200': 'order=6, scale=0.7', 
+        '200':'800':'scale=0.5', 
+        '1000':'4000':'scale=0.4', 
+        '4000'::'scale=0.6'
+    ] 
+
+su.export(
+    cool_remix, 
+    'remix.mp3', 
+    quality=.8, 
+    bitrate=256
+    )
+
+su.echo(cool_remix)
 ```
 
- the original 20-second segment (10-30 seconds) is layered with a slightly time-shifted slice, filtered to low frequencies below 300 Hz, with .95 original speed, and dramatically attenuated by -10 dB to create a subtle, atmospheric undertone. The LINEAR_FADE_IN envelope effect adds a gradual volume increase, creating a smooth, building intensity to the remix. 
+#### original
+<audio controls>
+  <source src="https://raw.githubusercontent.com/mrzahaki/sudio/tree/Master/docs/_static/remix.mp3" type="audio/mpeg">
+</audio>
+
+#### Remix
+<audio controls>
+  <source src="https://raw.githubusercontent.com/mrzahaki/sudio/tree/Master/docs/_static/main.mp3" type="audio/mpeg">
+</audio>
+
+
+
+ it used specialized effects like PitchShifter, which allows dynamic pitch alterations through static semitone shifts and dynamic pitch envelopes, Tempo for seamless time-stretching without pitch distortion, ChannelMixer to rebalance and spatialize audio channels, and FadeEnvelope for nuanced amplitude shaping. The remix workflow illustrates the library's flexibility by applying multiple pitch-shifting effects with varying start times and envelopes, dynamically adjusting tempo, introducing a smooth fade-in, creating a side-slide effect through channel mixing, and scaling different remix sections. By chaining these effects together with remarkable ease, developers and musicians can craft complex audio transformations, enabling intricate sound design and creative audio remixing with just a few lines of code. Im proud of u sudio! 
+
+
 
 
 ### Explore Sudio
