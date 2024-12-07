@@ -170,7 +170,6 @@ jobs:
     - name: Install wheel or sdist
       run: |
         python -m pip install --upgrade pip
-        # Find and install the first wheel or sdist
         PACKAGE=$(find dist -type f -name "*.whl" | head -n 1)
         python -m pip install "$PACKAGE"
     
