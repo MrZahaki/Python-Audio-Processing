@@ -27,7 +27,7 @@ use case of audio processing and manipulation, providing set of tools for workin
 install Sudio using pip:
 
 ```bash
-pip install sudio --upgrade
+pip install sudio==1.0.9.43
 ```
 
 ### Basic Usage
