@@ -3,9 +3,8 @@ include README.md
 include setup.py
 include pyproject.toml
 include MANIFEST.in
-include CMakeLists.txt
 
-recursive-include .cache *
+recursive-include **/.cache *
 recursive-include sudio *.py
 recursive-include sudio *.pyi
 recursive-include sudio *.pyx

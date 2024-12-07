@@ -39,7 +39,7 @@ dependencies = [
     "numpy>=2.0.1",
 ]
 [project.urls]
-source = "https://github.com/MrZahaki/sudio"
+source = "https://github.com/mrzahaki/sudio"
 
 [tool.cibuildwheel]
 build-frontend = "build"

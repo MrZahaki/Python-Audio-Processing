@@ -1,4 +1,3 @@
-
 # SUDIO - Audio Processing Platform
 # Copyright (C) 2024 Hossein Zahaki
 
@@ -118,13 +117,16 @@ class CustomBuildExt(build_ext):
         if "CMAKE_BUILD_PARALLEL_LEVEL" not in os.environ:
             if hasattr(self, "parallel") and self.parallel:
                 build_args.append(f"-j{self.parallel}")
+        
+        output_dir = Path(self.build_lib) / 'sudio'
+        cmake_args.append(f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={output_dir}")
 
     def _run_cmake_build(self, ext, cmake_args, build_args, build_temp):
         subprocess.run(
             ["cmake", ext.sourcedir, *cmake_args, "-Wno-dev", "--log-level", "NOTICE" ], cwd=build_temp, check=True
         )
         subprocess.run(
-            ["cmake", "--build", "." , "--parallel", *build_args], cwd=build_temp, check=True
+            ["cmake", "--build", ".", *build_args], cwd=build_temp, check=True
         )
 
 
@@ -177,8 +179,8 @@ cython_extensions = [
 ]
 
 cmake_extensions = [
-    CMakeExtension('sudio._rateshift'), 
-    CMakeExtension('sudio._suio'),
+    CMakeExtension('sudio._rateshift', sourcedir='sudio/rateshift'), 
+    CMakeExtension('sudio._suio', sourcedir='sudio/io'),
 ]
 
 cythonized_extensions = cythonize(

@@ -51,7 +51,7 @@ primary_domain = 'cpp'
 highlight_language = 'cpp'
 html_show_sourcelink = False
 autodoc_mock_imports = [
-    'sudio.suio', 
+    'sudio._suio', 
     'sudio.io', 
     'scipy', 
     'numpy',
