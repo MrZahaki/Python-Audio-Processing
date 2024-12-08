@@ -17,7 +17,7 @@
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrzahaki/sudio/blob/Master/docs/_static/sudio.ipynb)  
 
 
-use case of audio processing and manipulation, providing set of tools for working with digital audio files. supports operations like time-domain slicing, frequency filtering, audio mixing, streaming, and effect application across various audio formats, making complex audio engineering tasks accessible through a streamlined, Pythonic interface.
+use case of audio processing and manipulation, providing set of tools for working with digital audio files. supports operations like time-domain slicing, frequency filtering, audio mixing, streaming, and effect application across various audio formats, making complex audio engineering tasks accessible through a pythonic interface.
 
 
 ## 🚀 Quick Start
@@ -122,7 +122,7 @@ su.echo(cool_remix)
 
 
 
- it used specialized effects like PitchShifter, which allows dynamic pitch alterations through static semitone shifts and dynamic pitch envelopes, Tempo for seamless time-stretching without pitch distortion, ChannelMixer to rebalance and spatialize audio channels, and FadeEnvelope for nuanced amplitude shaping. The remix workflow illustrates the library's flexibility by applying multiple pitch-shifting effects with varying start times and envelopes, dynamically adjusting tempo, introducing a smooth fade-in, creating a side-slide effect through channel mixing, and scaling different remix sections. By chaining these effects together with remarkable ease, developers and musicians can craft complex audio transformations, enabling intricate sound design and creative audio remixing with just a few lines of code.
+ it used effects like PitchShifter, which allows dynamic pitch alterations through static semitone shifts and dynamic pitch envelopes, Tempo for seamless time-stretching without pitch distortion, ChannelMixer to rebalance and spatialize audio channels, and FadeEnvelope for nuanced amplitude shaping. The remix workflow shows the library's flexibility by applying multiple pitch-shifting effects with varying start times and envelopes, dynamically adjusting tempo, adding a smooth fade-in, creating a side-slide effect through channel mixing, and scaling different remix sections. By chaining these effects together you can craft complex audio transformations, enabling audio remixing with just a few lines of code.
 
 
 
