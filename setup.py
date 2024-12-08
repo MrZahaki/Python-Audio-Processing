@@ -151,7 +151,7 @@ else:
     extra_link_args = ['-lm']
 
 
-numpy_include = os.path.relpath(numpy.get_include())
+numpy_include = numpy.get_include()
 
 
 cython_extensions = [
