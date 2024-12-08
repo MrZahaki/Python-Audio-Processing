@@ -47,6 +47,8 @@ docs/doxyoutput
 docs/api
 docs/_static/sudio
 examples/
+**/*.Identifier
+
 # PyInstaller
 *.manifest
 *.spec

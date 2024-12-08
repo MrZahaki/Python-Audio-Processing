@@ -6,13 +6,15 @@ requires = [
     "pybind11>=2.12.0",
     "cython>=3.0.10",
     "numpy>=2.0.1",
+    "ninja>=1.10.0"
+
 ]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "sudio"
 license = {file = "LICENSE"}
-version = '1.0.9.43'
+version = '1.0.10'
 description = "Audio Processing Platform"
 authors = [{name = "Hossein Zahaki", email = "mrzahaki@gmail.com"}]
 readme = "README.md"
@@ -20,7 +22,7 @@ requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
+    "License :: OSI Approved :: GNU Affero General Public License v3 (AGPLv3)",
     "Programming Language :: C",
     'Programming Language :: Python',
     'Programming Language :: Python :: 3',
@@ -44,7 +46,6 @@ source = "https://github.com/mrzahaki/sudio"
 [tool.cibuildwheel]
 build-frontend = "build"
 skip = "cp36-* cp37-* cp38-* pp37-* *-manylinux_i686 *_ppc64le *_s390x *_universal2"
-# The build will use openblas64 everywhere, except on arm64 macOS >=14.0 (uses Accelerate)
 config-settings = "setup-args=-Duse-ilp64=true setup-args=-Dallow-noblas=false build-dir=build"
 build-verbosity = 0
 

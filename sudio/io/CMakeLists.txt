@@ -48,6 +48,23 @@ if (NOT DEFINED Python_FIND_FRAMEWORK)
     set(Python_FIND_FRAMEWORK "LAST")
 endif()
 
+function(apply_target_compile_options target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE 
+            /W0                 
+            /EHsc               
+            /MP                 
+            /bigobj             
+        )
+    else()
+        target_compile_options(${target} PRIVATE 
+            -O3                 
+            -fPIC               
+        )
+    endif()
+endfunction()
+
+
 find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 
 message(STATUS "Python_EXECUTABLE: ${Python_EXECUTABLE}")
@@ -201,7 +218,6 @@ pybind11_add_module(sudio_io
     src/alsa_suppressor.cpp
 )
 
-# Include directories
 target_include_directories(sudio_io PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/inc"
     "${CMAKE_CURRENT_SOURCE_DIR}/portaudio/include"
@@ -217,13 +233,42 @@ if(DEFINED PACKAGE_VERSION_INFO)
     add_definitions(-DPACKAGE_VERSION_INFO="${PACKAGE_VERSION_INFO}")
 endif()
 
+
 if(MSVC)
-    target_compile_options(sudio_io PRIVATE /EHsc /MP /bigobj)
+    add_compile_options(
+        /W0                     
+        /experimental:external  
+        /external:anglebrackets 
+        /external:W0            
+        /EHsc                   
+        /MP                     
+        /bigobj                 
+    )
+    
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /MANIFEST:NO")
+
 else()
-    target_compile_options(sudio_io PRIVATE -O3 -Wall -Wextra -fPIC)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        add_compile_options(
+            -w              
+            -Wno-everything 
+            -O3             
+            -fPIC           
+        )
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        add_compile_options(
+            -w              
+            -Wno-all        
+            -O3             
+            -fPIC           
+        )
+    endif()
 endif()
 
+set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "Suppress deprecation warnings" FORCE)
+set(CMAKE_SUPPRESS_DEPRECATION_MESSAGES ON CACHE BOOL "Suppress deprecated declarations" FORCE)
+
+apply_target_compile_options(sudio_io)
 
 
 set_target_properties(sudio_io
@@ -260,6 +305,9 @@ target_link_libraries(sudio_io PRIVATE
 
 include(GNUInstallDirs)
 install(TARGETS sudio_io
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    COMPONENT python
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
 )
+

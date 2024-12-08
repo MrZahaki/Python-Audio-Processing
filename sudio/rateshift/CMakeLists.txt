@@ -16,8 +16,6 @@
 
 # - GitHub: https://github.com/MrZahaki/sudio
 
-
-
 cmake_minimum_required(VERSION 3.20)
 project(python_rateshift LANGUAGES CXX)
 
@@ -47,6 +45,22 @@ endif()
 if (NOT DEFINED Python_FIND_FRAMEWORK)
     set(Python_FIND_FRAMEWORK "LAST")
 endif()
+
+function(apply_target_compile_options target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE 
+        /W0                 
+        /EHsc               
+        /MP                 
+        /bigobj             
+        )
+    else()
+        target_compile_options(${target} PRIVATE 
+        -O3                 
+        -fPIC               
+        )
+    endif()
+endfunction()
 
 find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 
@@ -104,13 +118,42 @@ target_include_directories(python_rateshift
         ${Python_INCLUDE_DIRS}
 )
 
-# Compiler options
+
 if(MSVC)
-    target_compile_options(python_rateshift PRIVATE /EHsc /MP /bigobj)
+    add_compile_options(
+        /W0                     
+        /experimental:external  
+        /external:anglebrackets 
+        /external:W0            
+        /EHsc                   
+        /MP                     
+        /bigobj                 
+    )
+    
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /MANIFEST:NO")
+
 else()
-    target_compile_options(python_rateshift PRIVATE -O3 -Wall -Wextra -fPIC)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        add_compile_options(
+            -w              
+            -Wno-everything 
+            -O3             
+            -fPIC           
+        )
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        add_compile_options(
+            -w              
+            -Wno-all        
+            -O3             
+            -fPIC           
+        )
+    endif()
 endif()
+
+set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "Suppress deprecation warnings" FORCE)
+set(CMAKE_SUPPRESS_DEPRECATION_MESSAGES ON CACHE BOOL "Suppress deprecated declarations" FORCE)
+
+apply_target_compile_options(python_rateshift)
 
 if(DEFINED PACKAGE_VERSION_INFO)
     add_definitions(-DPACKAGE_VERSION_INFO="${PACKAGE_VERSION_INFO}")
@@ -127,6 +170,8 @@ set_target_properties(python_rateshift
     PROPERTIES
         PREFIX ""
         OUTPUT_NAME "_rateshift"
+        LIBRARY_OUTPUT_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
         LINKER_LANGUAGE CXX
 )
 
@@ -138,6 +183,10 @@ target_link_libraries(python_rateshift
 
 include(GNUInstallDirs)
 install(TARGETS python_rateshift
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
+  COMPONENT python
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+  ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+  )
+
+  

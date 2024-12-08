@@ -26,6 +26,8 @@ from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
 from Cython.Build import cythonize
 import numpy
+import shutil
+
 
 CMAKE_PLATFORMS = {
     "win32": "Win32",
@@ -95,6 +97,7 @@ class CustomBuildExt(build_ext):
                 ])
             except ImportError:
                 pass
+        cmake_args.extend(["-DCMAKE_POSITION_INDEPENDENT_CODE=ON", "-DCMAKE_BUILD_TYPE=Release"])
 
     def _setup_windows_build(self, cmake_generator, cmake_args, build_args, cfg, extdir):
         single_config = any(x in cmake_generator for x in {"NMake", "Ninja"})
@@ -117,9 +120,13 @@ class CustomBuildExt(build_ext):
         if "CMAKE_BUILD_PARALLEL_LEVEL" not in os.environ:
             if hasattr(self, "parallel") and self.parallel:
                 build_args.append(f"-j{self.parallel}")
-        
+
         output_dir = Path(self.build_lib) / 'sudio'
-        cmake_args.append(f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={output_dir}")
+        cmake_args.extend([
+            f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={output_dir}",
+            f"-DCMAKE_INSTALL_LIBDIR={output_dir}",
+            f"-DCMAKE_RUNTIME_OUTPUT_DIRECTORY={output_dir}"
+        ])
 
     def _run_cmake_build(self, ext, cmake_args, build_args, build_temp):
         subprocess.run(
@@ -129,6 +136,14 @@ class CustomBuildExt(build_ext):
             ["cmake", "--build", ".", *build_args], cwd=build_temp, check=True
         )
 
+        output_dir = Path(self.build_lib) / 'sudio'
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        for so_file in build_temp.glob('**/*.so'):
+            dest = output_dir / so_file.name
+            shutil.copy2(so_file, dest)
+            print(f"Copied {so_file} to {dest}")
+
 
 if sys.platform.startswith('win'):
     extra_link_args = []
@@ -136,7 +151,7 @@ else:
     extra_link_args = ['-lm']
 
 
-numpy_include = numpy.get_include()
+numpy_include = os.path.relpath(numpy.get_include())
 
 
 cython_extensions = [
@@ -172,7 +187,7 @@ cython_extensions = [
     "sudio.utils.math",
     ["sudio/utils/math.pyx"],
     extra_link_args=extra_link_args,
-    include_dirs=[numpy.get_include()], 
+    include_dirs=[numpy_include], 
     extra_compile_args=['-O3'],
     language='c'
     )
@@ -207,3 +222,4 @@ setup(
         "": ["*.pxd", "*.pyx"],
     },
 )
+
