@@ -140,8 +140,27 @@ jobs:
       with:
         path: ./dist/*
 
+  upload_pypi:
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    if: github.event.inputs.upload_to_pypi == 'true'
+    steps:
+    - uses: actions/download-artifact@v3
+      with:
+        name: artifact
+        path: dist
+    
+    - name: List Build contents
+      run: ls -l dist
+      
+    - uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_TOKEN }}
+        skip_existing: true
+
   create_release:
-    needs: [extract_version, build_wheels, build_sdist]
+    needs: [extract_version, build_wheels, build_sdist, upload_pypi]
     runs-on: ubuntu-latest
     if: github.event.inputs.create_release == 'true'
     steps:
@@ -172,21 +191,3 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   
-  upload_pypi:
-    needs: [build_wheels, build_sdist]
-    runs-on: ubuntu-latest
-    if: github.event.inputs.upload_to_pypi == 'true'
-    steps:
-    - uses: actions/download-artifact@v3
-      with:
-        name: artifact
-        path: dist
-    
-    - name: List Build contents
-      run: ls -l dist
-      
-    - uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        user: __token__
-        password: ${{ secrets.PYPI_TOKEN }}
-        skip_existing: true
