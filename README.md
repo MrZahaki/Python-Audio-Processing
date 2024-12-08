@@ -122,7 +122,7 @@ su.echo(cool_remix)
 
 
 
- it used specialized effects like PitchShifter, which allows dynamic pitch alterations through static semitone shifts and dynamic pitch envelopes, Tempo for seamless time-stretching without pitch distortion, ChannelMixer to rebalance and spatialize audio channels, and FadeEnvelope for nuanced amplitude shaping. The remix workflow illustrates the library's flexibility by applying multiple pitch-shifting effects with varying start times and envelopes, dynamically adjusting tempo, introducing a smooth fade-in, creating a side-slide effect through channel mixing, and scaling different remix sections. By chaining these effects together with remarkable ease, developers and musicians can craft complex audio transformations, enabling intricate sound design and creative audio remixing with just a few lines of code. Im proud of u sudio! 
+ it used specialized effects like PitchShifter, which allows dynamic pitch alterations through static semitone shifts and dynamic pitch envelopes, Tempo for seamless time-stretching without pitch distortion, ChannelMixer to rebalance and spatialize audio channels, and FadeEnvelope for nuanced amplitude shaping. The remix workflow illustrates the library's flexibility by applying multiple pitch-shifting effects with varying start times and envelopes, dynamically adjusting tempo, introducing a smooth fade-in, creating a side-slide effect through channel mixing, and scaling different remix sections. By chaining these effects together with remarkable ease, developers and musicians can craft complex audio transformations, enabling intricate sound design and creative audio remixing with just a few lines of code.
 
 
 
