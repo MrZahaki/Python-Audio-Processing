@@ -1,4 +1,4 @@
-name: Release and Tag Management
+name: release
 on:
   workflow_dispatch:
     inputs:
