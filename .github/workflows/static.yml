@@ -3,6 +3,7 @@ name: Build and Deploy Docs
 on:
   push:
     branches: ["Master"]
+    tags: ["v*"]
   
   workflow_dispatch:
 
