@@ -26,43 +26,6 @@ permissions:
   contents: read
 
 jobs:
-  extract_version:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.get_version.outputs.VERSION }}
-    permissions:
-      contents: read
-    steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install toml
-    - name: Get version from pyproject.toml
-      id: get_version
-      run: |
-        VERSION=$(python -c "
-        import toml
-        import sys
-        try:
-            data = toml.load('pyproject.toml')
-            if 'tool' in data and 'poetry' in data['tool']:
-                version = data['tool']['poetry']['version']
-            elif 'project' in data:
-                version = data['project']['version']
-            else:
-                raise KeyError('Unable to find version in pyproject.toml')
-            print(version)
-        except Exception as e:
-            print(f'Error: {str(e)}', file=sys.stderr)
-            sys.exit(1)
-        ")
-        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-
   build_wheels:
     name: Build wheel ${{ matrix.python }}-${{ matrix.buildplat[1] }}-${{ matrix.buildplat[2] }}
     runs-on: ${{ matrix.buildplat[0] }}
@@ -80,6 +43,9 @@ jobs:
           - [macos-14, macosx_arm64, accelerate]
           - [windows-2019, win_amd64, ""]
           - [windows-2019, win32, ""]
+          - [ubuntu-22.04, linux_arm64, ""] 
+          - [windows-2019, win_arm64, ""]
+          
         python: ["cp310", "cp311", "cp312", "pp310", "cp313"]
         exclude:
           - buildplat: [windows-2019, win32, ""]
@@ -136,10 +102,6 @@ jobs:
         echo "CIBW_BUILD_FRONTEND=pip; args: --no-build-isolation" >> "$GITHUB_ENV"
     
     - name: Build wheels
-    #   run: |
-    #     python -m pip install --upgrade pip
-    #     python -m pip install cibuildwheel==2.22.0
-    #     python -m cibuildwheel --output-dir wheelhouse
       uses: pypa/cibuildwheel@ee63bf16da6cddfb925f542f2c7b59ad50e93969
       env:
         CIBW_BEFORE_BUILD: >
@@ -201,6 +163,46 @@ jobs:
         password: ${{ secrets.PYPI_TOKEN }}
         skip_existing: true
 
+  extract_version:
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.VERSION }}
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install toml
+    - name: Get version from pyproject.toml
+      id: get_version
+      run: |
+        VERSION=$(python -c "
+        import toml
+        import sys
+        try:
+            data = toml.load('pyproject.toml')
+            if 'tool' in data and 'poetry' in data['tool']:
+                version = data['tool']['poetry']['version']
+            elif 'project' in data:
+                version = data['project']['version']
+            else:
+                raise KeyError('Unable to find version in pyproject.toml')
+            print(version)
+        except Exception as e:
+            print(f'Error: {str(e)}', file=sys.stderr)
+            sys.exit(1)
+        ")
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+
+  
   create_release:
     needs: [extract_version, build_wheels, build_sdist, upload_pypi]
     runs-on: ubuntu-latest
