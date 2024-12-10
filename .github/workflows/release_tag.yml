@@ -12,9 +12,14 @@ on:
         required: true
         type: boolean
         default: true
+permissions: 
+  contents: read
+
 jobs:
   release-and-tag:
     runs-on: ubuntu-latest
+    permissions: 
+      contents: write
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
