@@ -110,8 +110,7 @@ jobs:
         python -m pip install cibuildwheel==2.22.0
         python -m cibuildwheel --output-dir wheelhouse
       env:
-        CIBW_BEFORE_BUILD: >
-          python -m pip install cmake setuptools setuptools_scm[toml] wheel pybind11 cython numpy
+        CIBW_SKIP: cp36-* pp*
         CIBW_BUILD: ${{ matrix.python }}-${{ matrix.buildplat[1] }}   
                 
     - uses: actions/upload-artifact@v3
