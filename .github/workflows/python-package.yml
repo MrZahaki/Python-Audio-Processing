@@ -22,11 +22,16 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+
 jobs:
   extract_version:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.VERSION }}
+    permissions:
+      contents: read
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
@@ -61,6 +66,8 @@ jobs:
   build_wheels:
     name: Build wheel ${{ matrix.python }}-${{ matrix.buildplat[1] }}-${{ matrix.buildplat[2] }}
     runs-on: ${{ matrix.buildplat[0] }}
+    permissions:
+      contents: read
     if: github.event.inputs.build_type == 'all' || github.event.inputs.build_type == 'wheels'
     strategy:
       fail-fast: false
@@ -117,6 +124,8 @@ jobs:
   build_sdist:
     name: Build sdist
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if: github.event.inputs.build_type == 'all' || github.event.inputs.build_type == 'sdist'
     
     steps:
@@ -143,6 +152,8 @@ jobs:
   upload_pypi:
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     if: github.event.inputs.upload_to_pypi == 'true'
     steps:
     - uses: actions/download-artifact@v3
@@ -162,6 +173,8 @@ jobs:
   create_release:
     needs: [extract_version, build_wheels, build_sdist, upload_pypi]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     if: github.event.inputs.create_release == 'true'
     steps:
     - uses: actions/checkout@v4
