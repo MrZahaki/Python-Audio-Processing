@@ -80,7 +80,7 @@ jobs:
           - [macos-14, macosx_arm64, accelerate]
           - [windows-2019, win_amd64, ""]
           - [windows-2019, win32, ""]
-        python: ["cp310", "cp311", "cp312", "pp310", "cp313", "cp313t"]
+        python: ["cp310", "cp311", "cp312", "pp310", "cp313"]
         exclude:
           - buildplat: [windows-2019, win32, ""]
             python: "pp310"
@@ -88,8 +88,10 @@ jobs:
             python: "pp310"
           - buildplat: [ macos-14, macosx_arm64, accelerate ]
             python: "pp310"
-          - buildplat: [ macos13, macosx_x86_64, openblas ]
-            python: "cp313t"
+          - buildplat: [macos-13, macosx_x86_64, openblas] 
+            python: "pp310" 
+          - buildplat: [macos-13, macosx_x86_64, accelerate] 
+            python: "pp310"
 
     steps:
     - uses: actions/checkout@v4
