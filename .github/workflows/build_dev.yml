@@ -119,6 +119,8 @@ jobs:
     #     python -m cibuildwheel --output-dir wheelhouse
       uses: pypa/cibuildwheel@ee63bf16da6cddfb925f542f2c7b59ad50e93969
       env:
+        CIBW_BEFORE_BUILD: >
+          python -m pip install cmake setuptools setuptools_scm[toml] wheel pybind11 cython numpy
         CIBW_PRERELEASE_PYTHONS: True
         CIBW_FREE_THREADED_SUPPORT: True
         CIBW_BUILD: ${{ matrix.python }}-${{ matrix.buildplat[1] }}   
