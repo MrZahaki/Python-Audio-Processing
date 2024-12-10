@@ -112,12 +112,7 @@ jobs:
     - name: Build wheel
       uses: pypa/cibuildwheel@ee63bf16da6cddfb925f542f2c7b59ad50e93969  # 2.22
       env:
-        CIBW_PRERELEASE_PYTHONS: True
-        CIBW_FREE_THREADED_SUPPORT: True
         CIBW_BUILD: ${{ matrix.python }}-${{ matrix.buildplat[1] }}        
-        CIBW_AFTER_BUILD: >
-          python -m pip install ./wheelhouse/*.whl
-          python -c "import sudio"
     
     - uses: actions/upload-artifact@v3
       with:
