@@ -105,6 +105,27 @@ jobs:
       with:
         architecture: 'x86'
 
+    - name: pkg-config-for-win
+      if: runner.os == 'windows'
+      run: |
+        choco install -y --no-progress --stoponfirstfailure --checksum 6004DF17818F5A6DBF19CB335CC92702 pkgconfiglite
+        $CIBW = "${{ github.workspace }}/.openblas"
+        $CIBW = $CIBW.replace("\","/")
+        echo "CIBW_ENVIRONMENT_WINDOWS=PKG_CONFIG_PATH=$CIBW" >> $env:GITHUB_ENV
+    
+    - name: Setup macOS
+      if: matrix.buildplat[0] == 'macos-13' || matrix.buildplat[0] == 'macos-14'
+      run: |
+        if [[ ${{ matrix.buildplat[2] }} == 'accelerate' ]]; then
+          CIBW="MACOSX_DEPLOYMENT_TARGET=14.0 INSTALL_OPENBLAS=false RUNNER_OS=macOS"
+          echo "CIBW_ENVIRONMENT_MACOS=$CIBW" >> "$GITHUB_ENV"
+          echo "CIBW_TEST_SKIP=*-macosx_x86_64" >> "$GITHUB_ENV"
+        else
+          CIBW="RUNNER_OS=macOS"
+          PKG_CONFIG_PATH="$PWD/.openblas"
+          DYLD="$DYLD_LIBRARY_PATH:/$PWD/.openblas/lib"
+          echo "CIBW_ENVIRONMENT_MACOS=$CIBW PKG_CONFIG_PATH=$PKG_CONFIG_PATH DYLD_LIBRARY_PATH=$DYLD" >> "$GITHUB_ENV"
+        fi
     
     - name: Set up free-threaded build
       if: matrix.python == 'cp313t'
