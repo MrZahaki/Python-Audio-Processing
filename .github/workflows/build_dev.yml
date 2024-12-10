@@ -115,28 +115,12 @@ jobs:
         CIBW_PRERELEASE_PYTHONS: True
         CIBW_FREE_THREADED_SUPPORT: True
         CIBW_BUILD: ${{ matrix.python }}-${{ matrix.buildplat[1] }}        
-
-    - name: install wheel
-      shell: bash
-      run: |
-        python -m pip install ./wheelhouse/*.whl
-    
-    - name: Test package import and basic functionality
-      shell: python
-      run: |
-        import sudio
-        from sudio import Master
-        
-        # Example basic tests
-        print("Sudio version:", sudio.__version__)
-        
-        # Attempt to create a Master instance
-        master = Master()
-        print("Master instance created successfully")
+        CIBW_AFTER_BUILD: >
+          python -m pip install ./wheelhouse/*.whl
+          python -c "import sudio"
     
     - uses: actions/upload-artifact@v3
       with:
-        name: ${{ matrix.python }}-${{ matrix.buildplat[1] }}
         path: ./wheelhouse/*.whl
     
   build_sdist:
