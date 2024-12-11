@@ -1,4 +1,4 @@
-name: Build[dev]
+name: Build [devops]
 on:
   workflow_dispatch:
     inputs:
@@ -45,17 +45,7 @@ jobs:
           - [windows-2019, win32, ""]
           
         python: ["cp310", "cp311", "cp312", "pp310", "cp313", "cp313t"]
-        exclude:
-          - buildplat: [windows-2019, win32, ""]
-            python: "pp310"
-          - buildplat: [ ubuntu-22.04, musllinux_x86_64, "" ]
-            python: "pp310"
-          - buildplat: [ macos-14, macosx_arm64, "" ]
-            python: "pp310"
-          - buildplat: [macos-13, macosx_x86_64, ""] 
-            python: "pp310" 
-          - buildplat: [macos-13, macosx_x86_64, ""] 
-            python: "pp310"
+
 
     steps:
     - uses: actions/checkout@v4
